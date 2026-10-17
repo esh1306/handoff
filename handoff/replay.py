@@ -19,7 +19,7 @@ import pandas as pd
 from handoff.actions import build_actions
 from handoff.config import REPO_ROOT, load_config
 
-sys.path.insert(0, str(REPO_ROOT / "video2sim"))
+sys.path.insert(0, str(REPO_ROOT / "monkeyseemonkeydo"))
 from controller import Sim  # noqa: E402
 from robots import ROBOTS  # noqa: E402
 from scene import build  # noqa: E402

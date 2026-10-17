@@ -5,7 +5,7 @@ Turn an ordinary phone video of a person doing a tabletop task into robot traini
 The repo has two pipelines that share the same language-action format (EgoLAP: "move down
 5 cm, close gripper") and the same simulated robot (Franka Panda in MuJoCo):
 
-| | `video2sim/` (working) | `handoff/` (in progress) |
+| | **Monkey See, Monkey Do** (`monkeyseemonkeydo/`, working) | `handoff/` (in progress) |
 |---|---|---|
 | Input | third-person video of a person | phone video + printed ArUco marker |
 | How | a vision model (GPT-6 Astra) watches the video, writes a MuJoCo scene and a robot plan, checks it in physics and fixes it until the robot succeeds | geometry: hand tracking + depth + marker give a metric wrist track, turned into per-second language actions |
@@ -13,17 +13,17 @@ The repo has two pipelines that share the same language-action format (EgoLAP: "
 | Status | end to end, with a web UI | `actions`, `synth` and `replay` built; perception, VLM labels and export still to do |
 
 Product plan and data contracts: [PRD.md](PRD.md) and [AGENTS.md](AGENTS.md).
-Demo script: [video2sim/DEMO.md](video2sim/DEMO.md).
+Demo script: [monkeyseemonkeydo/DEMO.md](monkeyseemonkeydo/DEMO.md).
 
 ## Quick start
 
 ```bash
 pip install -r requirements.txt              # handoff package (partner pipeline)
-pip install -r video2sim/requirements.txt    # video2sim + web UI
+pip install -r monkeyseemonkeydo/requirements.txt    # monkeyseemonkeydo + web UI
 git clone --depth 1 https://github.com/google-deepmind/mujoco_menagerie.git   # Franka Panda model
-echo OPENAI_API_KEY=sk-... > video2sim/.env  # never commit this
+echo OPENAI_API_KEY=sk-... > monkeyseemonkeydo/.env  # never commit this
 
-cd video2sim && python server.py             # web UI: http://127.0.0.1:8765
+cd monkeyseemonkeydo && python server.py             # web UI: http://127.0.0.1:8765
 ```
 
 In the UI: pick a video (or a built-in sample), a robot and a model, press **Make the robot
@@ -39,7 +39,7 @@ pytest                                                          # 15 tests
 
 ## What's in the repo
 
-### `video2sim/`: video to simulation to dataset
+### Monkey See, Monkey Do (`monkeyseemonkeydo/`): video to simulation to dataset
 
 1. **Watch.** Frames from the video (and the video itself for Gemini) go to a vision model.
 2. **Plan.** It writes the scene (primitive shapes or realistic scanned objects, sized and
@@ -53,27 +53,46 @@ pytest                                                          # 15 tests
    still succeed, as a LeRobot dataset with front + wrist cameras, joint state, actions,
    the task and the per-step language action.
 
-Details, file map and commands: [video2sim/README.md](video2sim/README.md).
+Details, file map and commands: [monkeyseemonkeydo/README.md](monkeyseemonkeydo/README.md).
+
+**Workbench UI.** The web UI at `/` is a three-step guided flow, not a single long page:
+
+1. **Set up** — pick a video (sample or your own), a robot and a model.
+2. **Run** — a short pipeline-diagram transition, then the live view: a five-stage indicator
+   (watch, plan, simulate, compare & fix, result) that updates in real time, the verdict for
+   the current round in plain English, your video next to the simulation, every round's
+   outcome, and the robot's full plan as a telemetry-style table (target, miss in mm, what
+   it's holding). A **Next: make training data** button appears the moment all checks pass.
+3. **Training data** — what standard is used (LeRobot v2.1) and why, then the dataset
+   generator and its results.
+
+Completed steps are marked with a checkmark and stay clickable, so you can jump back to
+review a past round or forward to training data without losing your place. The visual
+language (warm paper background, bold near-black text, a single deep-amber signal colour
+for anything live, monospace for every number and timestamp) is deliberately styled after
+lab instrumentation — oscilloscopes, servo controllers — rather than a generic dashboard,
+since this is a diagnostic tool for a simulation loop, not a consumer app. Dark mode exists
+but is opt-in only, so the look doesn't depend on the presenter's OS setting during a demo.
 
 ### `handoff/`: the geometry pipeline
 
 - `actions.py`: wrist track to EgoLAP language actions per 1 s window (unit tested).
 - `synth.py`: synthetic wrist track for building the rest before perception exists.
 - `replay.py`: the Franka carries out a take's language actions in MuJoCo with physics and
-  checks that the object ends up where the person put it. Uses the video2sim controller.
+  checks that the object ends up where the person put it. Uses the Monkey See, Monkey Do controller.
 - Still to build (see PRD): `perception.py` (MediaPipe hand landmarks + Depth Anything +
   ArUco), `transcribe.py`, `vlm.py`, `export.py`, `compose.py`, `app.py`.
 
 ### `qarm/`
 
 A standalone QArm-style arm with slider and drag control (`python qarm/run_qarm.py
-qarm/qarm.xml`). video2sim also supports it as `--robot qarm`.
+qarm/qarm.xml`). monkeyseemonkeydo also supports it as `--robot qarm`.
 
 ## Models and robots
 
 - Models: `gpt-6-astra` (default; OpenAI's most capable), `gpt-6.1-sol` (faster, about 5x
   cheaper), `gemini-4-argon`, `claude-opus-5-5`, or `mock` (no API call). Keys are read
-  from `video2sim/.env` or the environment.
+  from `monkeyseemonkeydo/.env` or the environment.
 - Robots: Franka Panda (MuJoCo Menagerie, 7 joints, grips from above, most reliable) and a
   QArm lookalike (4 joints, grips from the side).
 
@@ -104,7 +123,7 @@ qarm/qarm.xml`). video2sim also supports it as `--robot qarm`.
 ## Third-party assets
 
 - Franka Panda model: [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) (cloned, not committed).
-- Scanned objects in `video2sim/assets/scanned_objects/`: Google Scanned Objects, CC-BY 4.0,
-  MJCF conversion by Kevin Zakka (MIT). See its [ATTRIBUTION.md](video2sim/assets/scanned_objects/ATTRIBUTION.md).
+- Scanned objects in `monkeyseemonkeydo/assets/scanned_objects/`: Google Scanned Objects, CC-BY 4.0,
+  MJCF conversion by Kevin Zakka (MIT). See its [ATTRIBUTION.md](monkeyseemonkeydo/assets/scanned_objects/ATTRIBUTION.md).
 
 This repo has no license file yet; add one (for example MIT) before publishing.

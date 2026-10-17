@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 ASSETS = Path(__file__).parent / "assets"
-# Menagerie clone: video2sim/assets/mujoco_menagerie, or the repo root's mujoco_menagerie.
+# Menagerie clone: monkeyseemonkeydo/assets/mujoco_menagerie, or the repo root's mujoco_menagerie.
 MENAGERIE = next((p for p in (ASSETS / "mujoco_menagerie", Path(__file__).parent.parent / "mujoco_menagerie")
                   if (p / "franka_emika_panda").exists()), ASSETS / "mujoco_menagerie")
 

@@ -1,4 +1,4 @@
-# video2sim
+# Monkey See, Monkey Do
 
 Video of a person doing a tabletop task in; MuJoCo simulation of a robot doing the same
 task, and a LeRobot training dataset, out.
@@ -13,15 +13,15 @@ episodes through domain randomisation.
 ## Setup
 
 ```bash
-pip install -r video2sim/requirements.txt
-git clone --depth 1 https://github.com/google-deepmind/mujoco_menagerie.git   # repo root or video2sim/assets/
-echo OPENAI_API_KEY=sk-... > video2sim/.env     # never commit this file
+pip install -r monkeyseemonkeydo/requirements.txt
+git clone --depth 1 https://github.com/google-deepmind/mujoco_menagerie.git   # repo root or monkeyseemonkeydo/assets/
+echo OPENAI_API_KEY=sk-... > monkeyseemonkeydo/.env     # never commit this file
 ```
 
 ## Use
 
 ```bash
-cd video2sim
+cd monkeyseemonkeydo
 python server.py                  # web UI at http://127.0.0.1:8765  (--port to change)
 python loop.py --video clip.mp4 --robot panda --model gpt-6-astra   # same loop from the CLI
 python dataset.py runs/<id> --episodes 50                            # training dataset

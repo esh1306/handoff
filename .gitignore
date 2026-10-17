@@ -10,8 +10,8 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 
-# video2sim
-video2sim/runs/
+# monkeyseemonkeydo
+monkeyseemonkeydo/runs/
 mujoco-env/
-video2sim/datasets/
-video2sim/assets/gso/
+monkeyseemonkeydo/datasets/
+monkeyseemonkeydo/assets/gso/

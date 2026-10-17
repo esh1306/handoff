@@ -8,7 +8,7 @@ from handoff.synth import generate_synth_track
 
 pytestmark = pytest.mark.skipif(
     not (REPO_ROOT / "mujoco_menagerie/franka_emika_panda").exists()
-    and not (REPO_ROOT / "video2sim/assets/mujoco_menagerie/franka_emika_panda").exists(),
+    and not (REPO_ROOT / "monkeyseemonkeydo/assets/mujoco_menagerie/franka_emika_panda").exists(),
     reason="mujoco_menagerie not cloned",
 )
 

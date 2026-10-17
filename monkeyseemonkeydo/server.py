@@ -4,7 +4,7 @@
 
 Each run is a separate `loop.py` process writing into runs/<id>/; the server starts and
 stops those processes, streams their events.jsonl to the browser and serves every file
-they produce. API keys come from the environment or video2sim/.env. Binds to localhost only.
+they produce. API keys come from the environment or monkeyseemonkeydo/.env. Binds to localhost only.
 """
 import asyncio
 import json
@@ -39,7 +39,7 @@ MODELS = [  # (id, what it's good for); the first available one is the default
     ("mock", "Canned answer, no API call; checks the pipeline in seconds"),
 ]
 
-app = FastAPI(title="video2sim")
+app = FastAPI(title="monkeyseemonkeydo")
 procs: dict[str, subprocess.Popen] = {}
 
 
@@ -146,7 +146,7 @@ async def start_run(video: UploadFile | None = File(None), sample: str = Form(""
     except ValueError as e:
         raise HTTPException(400, str(e))
     if not has_key(prov):
-        raise HTTPException(400, f"No API key for {prov}: add {KEY_ENV[prov]}=... to video2sim/.env and restart the server")
+        raise HTTPException(400, f"No API key for {prov}: add {KEY_ENV[prov]}=... to monkeyseemonkeydo/.env and restart the server")
     sample_file = SAMPLES / f"{Path(sample).name}.mp4" if sample else None
     if sample_file and not sample_file.exists():
         raise HTTPException(404, f"No sample {sample!r}")

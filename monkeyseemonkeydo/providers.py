@@ -7,7 +7,7 @@ Every provider takes the same input: a text prompt, labelled JPEG images and
     get_provider("claude-opus-5-5")  -> Anthropic (ANTHROPIC_API_KEY)
     get_provider("gpt-6.1-sol")      -> OpenAI (OPENAI_API_KEY)
 
-Keys come from the environment or from video2sim/.env.
+Keys come from the environment or from monkeyseemonkeydo/.env.
     get_provider("mock")             -> canned answers, no network (pipeline testing)
 """
 import base64
@@ -18,7 +18,7 @@ from pathlib import Path
 
 
 def load_env(path=Path(__file__).parent / ".env"):
-    """Read KEY=value lines from video2sim/.env into the environment (real env vars win)."""
+    """Read KEY=value lines from monkeyseemonkeydo/.env into the environment (real env vars win)."""
     if path.exists():
         for line in path.read_text(encoding="utf-8").splitlines():
             key, sep, value = line.partition("=")

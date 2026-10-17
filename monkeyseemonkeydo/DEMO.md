@@ -16,14 +16,14 @@
 ## 2. Process it (about 1 to 2 minutes per clip)
 
 ```bash
-cd video2sim
+cd monkeyseemonkeydo
 python server.py            # http://127.0.0.1:8765
 ```
 
 In the workbench: **My own video**, choose the clip, **Franka Panda**, **gpt-6-astra**,
 type the task under More options ("puts the lemon in the bowl"), then **Make the robot
 do it**. Do this before going on stage so the result is cached; runs stay in
-`video2sim/runs/` and need no network to show again.
+`monkeyseemonkeydo/runs/` and need no network to show again.
 
 If a take fails, record another rather than tuning: clearer motion and a simpler
 object fix most failures.
