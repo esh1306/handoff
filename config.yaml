@@ -1,0 +1,30 @@
+fps: 30
+window_s: 1.0
+marker:
+  dict: DICT_4X4_50
+  id: 0
+  size_m: 0.10          # measured printed black-square size
+camera:
+  calib_file: calib/iphone.json   # fallback: fx = fy = 1.2 * width, cx/cy = centre
+perception:
+  depth_model: depth-anything/Depth-Anything-V2-Small-hf
+  depth_every_n: 2
+  grip_close_ratio: 0.35          # thumb-index tip dist / hand length
+  grip_hysteresis_frames: 3
+  max_interp_gap: 5
+  savgol_window: 9
+  savgol_order: 2
+vlm:
+  model_final: gpt-6-astra
+  model_dev: gpt-5.6-luna
+  use_final: false
+  keyframe_px: 512
+transcribe:
+  model: whisper-1
+replay:
+  menagerie_scene: mujoco_menagerie/franka_emika_panda/scene.xml
+  robot_base_in_table: [0.0, -0.45, 0.0]   # metres; robot sits where the person sits
+  max_reach_m: 0.85
+  attach_dist_m: 0.06
+  render_w: 960
+  render_h: 720

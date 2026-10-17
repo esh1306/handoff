@@ -1,0 +1,11 @@
+raw/
+takes/
+export/
+mujoco_menagerie/
+.env
+assets/*.task
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
