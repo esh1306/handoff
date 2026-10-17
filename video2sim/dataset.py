@@ -53,7 +53,7 @@ def plan_roles(spec, metrics):
 
 def footprint(o):
     s = o["size"]
-    return math.hypot(s[0], s[1]) if o["shape"] in ("box", "container") else s[0]
+    return math.hypot(s[0], s[1]) if o["shape"] in ("box", "container", "mesh") else s[0]
 
 
 def randomise(spec, roles, rng, pos_jitter, yaw_jitter):

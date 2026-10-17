@@ -5,7 +5,7 @@ import numpy as np
 import mujoco
 
 from robots import Robot
-from scene import half_height
+from scene import half_height, holds_inside
 
 DEFAULT_CAMERA = {"lookat": [0.45, 0.0, 0.1], "distance": 1.6, "azimuth": 150, "elevation": -25}
 
@@ -264,12 +264,12 @@ class Sim:
         R = self.d.xmat[self.objects[c["support"]]].reshape(3, 3)
         local = R.T @ (p - sp)
         sz = sup["size"]
-        if sup["shape"] in ("box", "container"):
+        if sup["shape"] in ("box", "container", "mesh"):
             inside = abs(local[0]) <= sz[0] and abs(local[1]) <= sz[1]
         else:  # cylinder / sphere
             inside = math.hypot(local[0], local[1]) <= sz[0]
         hh = half_height(sup)
-        if sup["shape"] == "container":
+        if holds_inside(sup):
             level = -hh <= local[2] <= hh + 0.05
         else:
             level = local[2] >= hh - 0.01

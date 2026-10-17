@@ -1,0 +1,12 @@
+{
+  "_source": "Google Scanned Objects via https://github.com/kevinzakka/mujoco_scanned_objects (MJCF: MIT; meshes and textures: CC-BY 4.0, Google). Sizes are full extents in cm, measured from model.obj. grasp_yaw/grasp_height: Panda grasp that worked in testing (gripper yaw in degrees; height as a fraction of the object's height).",
+  "triceratops": {"folder": "Great_Dinos_Triceratops_Toy", "kind": "graspable", "size_cm": [6.9, 4.6, 7.9], "grasp_yaw": 0, "grasp_height": 0.45, "mass": 0.05, "label": "small plastic triceratops toy"},
+  "android_figure": {"folder": "Android_Figure_Orange", "kind": "graspable", "size_cm": [6.6, 4.6, 8.1], "grasp_yaw": 0, "grasp_height": 0.45, "mass": 0.05, "label": "small orange Android figurine"},
+  "rhino": {"folder": "Schleich_African_Black_Rhino", "kind": "graspable", "size_cm": [4.1, 13.8, 6.0], "grasp_yaw": 0, "grasp_height": 0.45, "mass": 0.06, "label": "toy rhino figurine, long and narrow"},
+  "vitamin_bottle": {"folder": "Perricone_MD_Vitamin_C_Ester_15", "kind": "graspable", "size_cm": [8.1, 6.4, 13.0], "grasp_yaw": 0, "grasp_height": 0.45, "mass": 0.12, "label": "small cosmetics bottle in a box"},
+  "ink_cartridge": {"folder": "Office_Depot_Canon_CLI_8Y_Ink_Cartridge_Yellow_0623B002", "kind": "graspable", "size_cm": [8.6, 4.9, 11.8], "grasp_yaw": 90, "grasp_height": 0.45, "mass": 0.05, "label": "small yellow ink cartridge box"},
+  "turquoise_bowl": {"folder": "Room_Essentials_Bowl_Turquiose", "kind": "container", "size_cm": [15.7, 15.7, 8.3], "mass": 0.35, "label": "turquoise cereal bowl"},
+  "sand_bowl": {"folder": "Footed_Bowl_Sand", "kind": "container", "size_cm": [16.1, 16.2, 10.9], "mass": 0.4, "label": "sand-coloured footed ceramic bowl"},
+  "black_bowl": {"folder": "Now_Designs_Bowl_Akita_Black", "kind": "container", "size_cm": [16.0, 15.9, 7.5], "mass": 0.35, "label": "black ceramic bowl"},
+  "turquoise_plate": {"folder": "Room_Essentials_Salad_Plate_Turquoise", "kind": "surface", "size_cm": [22.2, 22.2, 2.8], "mass": 0.4, "label": "turquoise salad plate"}
+}

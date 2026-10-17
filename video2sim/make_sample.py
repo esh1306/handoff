@@ -1,5 +1,10 @@
-"""Render samples/hand_puts_cube_in_bowl.mp4: a stand-in 'person' (hand + forearm) moving
-a cube into a bowl, filmed from the side. Lets you try the pipeline without your own video."""
+"""Render sample clips of a stand-in 'person' (hand + forearm) doing a pick-and-place, filmed
+from the side. Lets you try the pipeline without your own video.
+
+    python make_sample.py          # samples/hand_puts_cube_in_bowl.mp4 (primitive shapes)
+    python make_sample.py --toy    # samples/hand_puts_dinosaur_in_bowl.mp4 (scanned objects)
+"""
+import sys
 from pathlib import Path
 
 import imageio_ffmpeg
@@ -50,9 +55,24 @@ def hand_at(t):
     return np.array(KEYS[-1][1]), False
 
 
-def main(out=Path(__file__).parent / "samples" / "hand_puts_cube_in_bowl.mp4", fps=30):
+def toy_xml():
+    """XML with the scanned triceratops (carried) and turquoise bowl instead of cube and box."""
+    objs = Path(__file__).parent / "assets" / "scanned_objects"
+    dino, bowl = objs / "Great_Dinos_Triceratops_Toy", objs / "Room_Essentials_Bowl_Turquiose"
+    assets = "".join(f'<texture name="{n}_t" type="2d" file="{d / "texture.png"}"/>'
+                     f'<material name="{n}_m" texture="{n}_t"/><mesh name="{n}" file="{d / "model.obj"}"/>'
+                     for n, d in (("dino", dino), ("bowl", bowl)))
+    xml = XML.replace("<worldbody>", f"<asset>{assets}</asset><worldbody>")
+    start, end = xml.index('<body name="bowl"'), xml.index("</body>", xml.index('<body name="bowl"')) + 7
+    xml = xml[:start] + '<body name="bowl" pos=".05 .18 0"><geom type="mesh" mesh="bowl" material="bowl_m"/></body>' + xml[end:]
+    xml = xml.replace('<geom type="box" size=".025 .025 .025" rgba=".85 .1 .1 1"/>',
+                      '<geom type="mesh" mesh="dino" material="dino_m" pos="0 0 -.025"/>')
+    return xml
+
+
+def main(out=Path(__file__).parent / "samples" / "hand_puts_cube_in_bowl.mp4", fps=30, xml=XML):
     out.parent.mkdir(exist_ok=True)
-    m = mujoco.MjModel.from_xml_string(XML)
+    m = mujoco.MjModel.from_xml_string(xml)
     d = mujoco.MjData(m)
     hand, cube = m.body("hand").mocapid[0], m.body("cube").mocapid[0]
     cam = mujoco.MjvCamera()
@@ -78,4 +98,7 @@ def main(out=Path(__file__).parent / "samples" / "hand_puts_cube_in_bowl.mp4", f
 
 
 if __name__ == "__main__":
-    main()
+    if "--toy" in sys.argv:
+        main(Path(__file__).parent / "samples" / "hand_puts_dinosaur_in_bowl.mp4", xml=toy_xml())
+    else:
+        main()

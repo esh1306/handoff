@@ -1,13 +1,29 @@
 """Prompts for the analyse -> simulate -> critique loop."""
 import json
 
+from scene import CATALOG
+
+
+def catalog_text():
+    """The scanned objects the model may use instead of primitive shapes."""
+    lines = []
+    for key, c in CATALOG.items():
+        w, d, h = c["size_cm"]
+        grasp = (f"; grasp at yaw {c['grasp_yaw']} deg, tool height {c['grasp_height']:.0%} of its height"
+                 if c["kind"] == "graspable" else "")
+        lines.append(f'- "{key}": {c["label"]}, {w} x {d} x {h} cm, {c["kind"]}{grasp}')
+    return ("Realistic scanned objects (use one when it plausibly matches an object in the video, otherwise a "
+            'primitive shape): {"name": ..., "shape": "mesh", "mesh": "<key>", "pos": [x, y, z], "yaw": deg}. '
+            "Their size is fixed (omit size); pos is the object's centre, so on the table z = half its height.\n"
+            + "\n".join(lines))
+
 SCHEMA = """\
 {
   "task_description": "one sentence: what the person accomplishes",
   "reasoning": "how you estimated object sizes and positions, and how you mapped the person's hand motion onto the robot",
   "camera": {"lookat": [x, y, z], "distance": metres, "azimuth": degrees, "elevation": degrees},
   "objects": [
-    {"name": "red_cube", "shape": "box | cylinder | sphere | container",
+    {"name": "red_cube", "shape": "box | cylinder | sphere | container | mesh",
      "size": [...], "pos": [x, y, z], "yaw": degrees, "rgba": [r, g, b, 1],
      "mass": kg, "fixed": false}
   ],
@@ -65,6 +81,8 @@ At yaw 0 the fingers close along world axis {closing_axis}; yaw rotates the grip
 
 {RULES}
 
+{catalog_text()}
+
 Reply with ONLY one JSON object in this format (no other text):
 {SCHEMA}"""
 
@@ -91,4 +109,6 @@ Fix the actual cause of each failure (geometry, positions, approach height, yaw,
 rather than loosening the success checks.
 
 Rules, for reference:
-{RULES}"""
+{RULES}
+
+{catalog_text()}"""

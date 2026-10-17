@@ -14,3 +14,4 @@ __pycache__/
 video2sim/runs/
 mujoco-env/
 video2sim/datasets/
+video2sim/assets/gso/

@@ -1,19 +1,42 @@
 """Turn a scene spec (JSON from the model) into a compiled MuJoCo model."""
+import json
 import math
+from pathlib import Path
+
 import mujoco
 import numpy as np
 
 from robots import Robot
 
-SHAPES = {"box", "cylinder", "sphere", "container"}
+ASSETS = Path(__file__).parent / "assets"
+# Realistic scanned objects the model can pick by name (shape "mesh", "mesh": <key>).
+CATALOG = {k: v for k, v in json.loads((ASSETS / "objects.json").read_text(encoding="utf-8")).items()
+           if not k.startswith("_")}
+
+SHAPES = {"box", "cylinder", "sphere", "container", "mesh"}
 ACTIONS = {"move_to", "move_by", "open", "close", "wait"}
 CHECKS = {"object_on", "object_near", "object_lifted"}
-SIZE_LEN = {"box": 3, "cylinder": 2, "sphere": 1, "container": 3}
+SIZE_LEN = {"box": 3, "cylinder": 2, "sphere": 1, "container": 3, "mesh": 3}
 
 
 def half_height(obj):
     s = obj["size"]
-    return s[{"box": 2, "container": 2, "cylinder": 1, "sphere": 0}[obj["shape"]]]
+    return s[{"box": 2, "container": 2, "mesh": 2, "cylinder": 1, "sphere": 0}[obj["shape"]]]
+
+
+def holds_inside(obj):
+    """True for objects things go *into* (bins, bowls) rather than onto."""
+    return obj["shape"] == "container" or (obj["shape"] == "mesh" and obj.get("kind") == "container")
+
+
+def fill_meshes(spec):
+    """Give scanned objects their real size, mass and kind from the catalogue."""
+    for o in spec.get("objects", []):
+        if o.get("shape") == "mesh" and o.get("mesh") in CATALOG:
+            c = CATALOG[o["mesh"]]
+            o["size"] = [round(v / 200, 4) for v in c["size_cm"]]  # half extents in m
+            o.setdefault("mass", c["mass"])
+            o["kind"] = c["kind"]
 
 
 def validate(spec):
@@ -24,6 +47,7 @@ def validate(spec):
             errs.append(f"'{key}' must be a list")
     if errs:
         return errs
+    fill_meshes(spec)
     names = set()
     for i, o in enumerate(spec["objects"]):
         n = o.get("name")
@@ -32,6 +56,9 @@ def validate(spec):
         names.add(n)
         if o.get("shape") not in SHAPES:
             errs.append(f"objects[{i}] {n}: shape must be one of {sorted(SHAPES)}")
+            continue
+        if o["shape"] == "mesh" and o.get("mesh") not in CATALOG:
+            errs.append(f"objects[{i}] {n}: mesh must be one of {sorted(CATALOG)}")
             continue
         size = o.get("size")
         if (not isinstance(size, list) or len(size) != SIZE_LEN[o["shape"]]
@@ -59,7 +86,20 @@ def validate(spec):
     return errs
 
 
-def _add_object(world, o):
+def _add_mesh_assets(ms, key):
+    """Register a scanned object's texture, material and meshes once per model."""
+    if ms.material(f"{key}_mat") is not None:
+        return
+    folder = ASSETS / "scanned_objects" / CATALOG[key]["folder"]
+    tex = ms.add_texture(name=f"{key}_tex", type=mujoco.mjtTexture.mjTEXTURE_2D, file=str(folder / "texture.png"))
+    mat = ms.add_material(name=f"{key}_mat")
+    mat.textures[mujoco.mjtTextureRole.mjTEXROLE_RGB] = tex.name
+    ms.add_mesh(name=f"{key}_vis", file=str(folder / "model.obj"))
+    for f in sorted(folder.glob("model_collision_*.obj")):
+        ms.add_mesh(name=f"{key}_{f.stem}", file=str(f))
+
+
+def _add_object(ms, world, o):
     yaw = math.radians(o.get("yaw", 0))
     pos = list(map(float, o["pos"]))
     pos[2] = max(pos[2], half_height(o))  # never start below the table
@@ -69,6 +109,19 @@ def _add_object(world, o):
     rgba = o.get("rgba", [0.6, 0.6, 0.6, 1])
     common = dict(rgba=rgba, condim=4, friction=[o.get("friction", 1.2), 0.005, 0.0001])
     s, shape = o["size"], o["shape"]
+
+    if shape == "mesh":  # scanned object; its mesh origin is the bottom centre, ours is the centre
+        key = o["mesh"]
+        _add_mesh_assets(ms, key)
+        offset = [0, 0, -s[2]]
+        body.add_geom(type=mujoco.mjtGeom.mjGEOM_MESH, meshname=f"{key}_vis", material=f"{key}_mat",
+                      pos=offset, contype=0, conaffinity=0, group=2, mass=0)
+        parts = [m.name for m in ms.meshes if m.name.startswith(f"{key}_model_collision_")]
+        for name in parts:
+            body.add_geom(type=mujoco.mjtGeom.mjGEOM_MESH, meshname=name, pos=offset, group=3,
+                          mass=o.get("mass", 0.05) / len(parts), condim=4,
+                          friction=[o.get("friction", 1.2), 0.005, 0.0001])
+        return
 
     if shape == "container":  # open-top box: floor + four walls
         hx, hy, hz = s
@@ -118,6 +171,7 @@ def build(spec, robot: Robot):
     world.add_light(pos=[1.5, -1.5, 2], dir=[-0.5, 0.5, -0.6], diffuse=[0.3, 0.3, 0.3])
     world.add_geom(name="table", type=mujoco.mjtGeom.mjGEOM_PLANE, size=[3, 3, 0.1],
                    rgba=[0.8, 0.78, 0.74, 1])
+    fill_meshes(spec)
     for o in spec["objects"]:
-        _add_object(world, o)
+        _add_object(ms, world, o)
     return ms.compile(), ms
