@@ -13,3 +13,4 @@ __pycache__/
 # video2sim
 video2sim/runs/
 mujoco-env/
+video2sim/datasets/

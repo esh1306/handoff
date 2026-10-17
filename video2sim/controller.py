@@ -18,7 +18,8 @@ def _rotz(deg):
 class Sim:
     CTRL_DT = 0.02  # control period (s)
 
-    def __init__(self, model, robot: Robot, spec, video_path=None, size=(480, 640), fps=30, on_tick=None):
+    def __init__(self, model, robot: Robot, spec, video_path=None, size=(480, 640), fps=30, on_tick=None,
+                 camera_jitter=None):
         self.m, self.robot, self.spec = model, robot, spec
         self.d = mujoco.MjData(model)
         self.scratch = mujoco.MjData(model)  # IK workspace, never stepped
@@ -42,24 +43,27 @@ class Sim:
         self.fps = fps
         self.writer = None
         self.mirrored = False
+        self.renderer = None
+        self.recorder = None   # optional callable(sim), run every control tick (dataset export)
+        self.cam = mujoco.MjvCamera()
+        self.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+        cam = {**DEFAULT_CAMERA, **(spec.get("camera") or {})}
+        az, el = cam["azimuth"], cam["elevation"]
+        if math.cos(math.radians(az)) > 0.3:
+            # Camera behind the robot (looking along +x): its body would hide the task,
+            # so film it from the front instead. Left and right appear swapped.
+            az = 180 - az
+            self.mirrored = True
+        if camera_jitter:
+            az, el = az + camera_jitter[0], el + camera_jitter[1]
+        self.cam.lookat[:] = cam["lookat"]
+        self.cam.distance, self.cam.azimuth, self.cam.elevation = max(cam["distance"], 1.2), az, el
         if self.record:
             # H.264 so browsers can play it
             self.writer = imageio_ffmpeg.write_frames(str(video_path), (size[1], size[0]), fps=fps,
                                                       codec="libx264", quality=7)
             self.writer.send(None)
             self.renderer = mujoco.Renderer(m, *size)
-            self.cam = mujoco.MjvCamera()
-            self.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-            cam = {**DEFAULT_CAMERA, **(spec.get("camera") or {})}
-            az = cam["azimuth"]
-            if math.cos(math.radians(az)) > 0.3:
-                # Camera behind the robot (looking along +x): its body would hide the task,
-                # so film it from the front instead. Left and right appear swapped.
-                az = 180 - az
-                self.mirrored = True
-            self.cam.lookat[:] = cam["lookat"]
-            self.cam.distance, self.cam.azimuth, self.cam.elevation = (
-                max(cam["distance"], 1.2), az, cam["elevation"])
         self.keyframes = []   # (label, RGB) at the end of each plan step
         self.reset()
 
@@ -76,6 +80,8 @@ class Sim:
         self.home_rot = d.site_xmat[self.site].reshape(3, 3).copy()
         self.target = d.site_xpos[self.site].copy()
         self.yaw = 0.0
+        self.grip_closed = False
+        self.step_index = -1
         self.next_frame = 0.0
         self.max_z = {n: d.xpos[b][2] for n, b in self.objects.items()}
         self.initial = {n: d.xpos[b].copy() for n, b in self.objects.items()}
@@ -128,6 +134,8 @@ class Sim:
         if self.record and d.time >= self.next_frame:
             self.writer.send(np.ascontiguousarray(self.render()))
             self.next_frame += 1.0 / self.fps
+        if self.recorder:
+            self.recorder(self)
         if self.on_tick:
             self.on_tick()
 
@@ -136,12 +144,13 @@ class Sim:
         if self.writer:
             self.writer.close()
             self.writer = None
-        if self.record and self.renderer is not None:
+        if self.renderer is not None:
             self.renderer.close()
             self.renderer = None
 
-    def render(self):
-        self.renderer.update_scene(self.d, camera=self.cam)
+    def render(self, camera=None):
+        """RGB image from the scene camera, or from a named model camera (e.g. "wrist")."""
+        self.renderer.update_scene(self.d, camera=self.cam if camera is None else camera)
         return self.renderer.render().copy()
 
     def hold(self, seconds):
@@ -183,6 +192,7 @@ class Sim:
         return worst
 
     def gripper(self, close):
+        self.grip_closed = bool(close)
         self.d.ctrl[self.grip_act] = self.robot.gripper_closed if close else self.robot.gripper_open
         self.hold(0.8)
 
@@ -192,6 +202,7 @@ class Sim:
         if self.record:
             self.keyframes.append(("sim initial state", self.render()))
         for i, step in enumerate(plan):
+            self.step_index = i
             a = step["action"]
             # sim time == time in sim.mp4, so the UI can follow the steps while the video plays
             info = {"i": i, "action": a, "language": step.get("language", ""), "t_start": round(self.d.time, 2)}

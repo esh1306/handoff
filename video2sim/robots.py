@@ -24,6 +24,10 @@ class Robot:
     orient_ik: bool          # True: IK holds the gripper pointing down + yaw; False: position only
     home: dict = field(default_factory=dict)  # joint name -> initial qpos
     wrist_actuator: str | None = None         # position-only robots: yaw drives this joint
+    wrist_cam: tuple | None = None            # (pos, look-at point, up hint) in tcp_body coordinates
+    gripper_joints: tuple = ()                # finger joints, for the gripper opening in the state
+    gripper_qpos_open: float = 0.0            # finger joint position when open / closed
+    gripper_qpos_closed: float = 0.0
     notes: str = ""
 
 
@@ -41,6 +45,10 @@ ROBOTS = {
         gripper_closed=[0],
         max_opening=0.08,
         orient_ik=True,
+        wrist_cam=((0.1, 0, -0.02), (0, 0, 0.13), (0, 0, -1)),  # beside the hand, aimed past the fingertips
+        gripper_joints=("finger_joint1", "finger_joint2"),
+        gripper_qpos_open=0.04,
+        gripper_qpos_closed=0.0,
         home={"joint1": 0, "joint2": 0, "joint3": 0, "joint4": -1.57079, "joint5": 0,
               "joint6": 1.57079, "joint7": -0.7853, "finger_joint1": 0.04, "finger_joint2": 0.04},
         notes=("7-DOF Franka Emika Panda with a parallel gripper (max opening 8 cm). "
@@ -62,6 +70,10 @@ ROBOTS = {
         max_opening=0.07,
         orient_ik=False,
         wrist_actuator="wrist_roll",
+        wrist_cam=((0.085, 0, 0.04), (0.2, 0, 0), (0, 0, 1)),  # front edge of the wrist, aimed between the fingers
+        gripper_joints=("finger_l", "finger_r"),
+        gripper_qpos_open=0.0,
+        gripper_qpos_closed=0.03,
         notes=("4-DOF QArm-like arm (base yaw, shoulder pitch, elbow pitch, wrist roll) with a "
                "two-finger gripper (max opening 7 cm). Base at the origin; shoulder 0.14 m above "
                "the table, upper arm 0.35 m, forearm 0.25 m. Reach roughly 0.2-0.5 m from the base. "

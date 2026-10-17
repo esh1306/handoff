@@ -55,6 +55,17 @@ form { display: grid; gap: 18px; }
 .upload { grid-column: 2; font-size: 12.5px; color: var(--muted); }
 .upload input { max-width: 100%; margin-top: 4px; font-size: 12.5px; }
 details.more summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+.ds p { margin: 0 0 6px; }
+.ds-form { display: flex; gap: 10px; align-items: flex-end; margin-top: 10px; }
+.ds-form label { width: 120px; }
+.ds-form .btn.primary { padding: 8px 16px; font-size: 14px; }
+.bar { height: 10px; border-radius: 99px; background: var(--chip); overflow: hidden; margin: 8px 0; }
+.bar span { display: block; height: 100%; background: var(--run); transition: width .3s; }
+@media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }
+.ds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.ds-grid figure { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.ds-grid video { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; background: #000; }
+.ds-grid figcaption { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
 .film-guide { font-size: 13px; padding: 2px 2px 0; }
 .film-guide ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--muted); }
 .film-guide b { color: var(--ink); font-weight: 600; }
@@ -335,6 +346,7 @@ async function refresh() {
     state.detail = await api(`/api/runs/${state.current}`);
     const n = state.detail.iterations.length;
     if (state.round === null || (state.round === prev && n > prev)) state.round = n;  // follow the newest round
+    await loadDataset();
     render();
   } catch (err) {
     $("#main").innerHTML = `<div class="intro"><h2>This run can't be opened</h2><p>${esc(err.message)}</p></div>`;
@@ -477,6 +489,8 @@ function render() {
       return `<li><button data-round="${r.n}" aria-pressed="${state.round === r.n}"><b>Round ${r.n}</b>${res}<span class="ch">${esc(ch)}</span></button></li>`;
     }).join("")}</ul>` : ""}
 
+    ${datasetSection(d)}
+
     ${it ? `<div class="strip-title">What the model saw in your video</div>${film(d.video_frames)}
             <div class="strip-title">What the robot did in round ${it.n}</div>${film(it.frames)}` :
       d.video_frames.length ? `<div class="strip-title">Frames sent to the model</div>${film(d.video_frames)}` : ""}
@@ -489,6 +503,49 @@ function render() {
     const el = $("#since"), last = d.events[d.events.length - 1];
     if (el && last) el.textContent = ago(Date.now() / 1000 - last.t) + " ago";
   }, 1000);
+}
+
+/* ---------- training dataset ---------- */
+function datasetSection(d) {
+  if (d.status !== "done" || !d.all_success) return "";
+  const ds = state.ds || { status: "none" };
+  const head = `<h3 class="sec">Training data</h3>`;
+  const form = (label) => `
+    <div class="ds-form">
+      <label class="f">Episodes <input type="number" id="dsEpisodes" value="${ds.target || 50}" min="1" max="1000"></label>
+      <button class="btn primary" data-act="dataset">${label}</button>
+    </div>`;
+  if (ds.status === "none") return `${head}<div class="box ds">
+      <p>Turn this run into a dataset for training robot policies (VLAs such as pi0, SmolVLA or ACT) in the LeRobot format.</p>
+      <p class="hint">Each episode re-runs the robot with the objects moved, rotated and recoloured and the camera shifted. Only episodes where the robot still succeeds are kept. Every frame has a front and a wrist camera, joint positions, the commanded action, the task and the current language action. About 2 s per episode.</p>
+      ${form("Make training data")}</div>`;
+  if (ds.status === "running") {
+    const pct = ds.target ? Math.round(100 * ds.kept / ds.target) : 0;
+    return `${head}<div class="box ds"><p><b>Making training data:</b> ${ds.kept} of ${ds.target} episodes kept${ds.tried ? `, ${ds.tried} tried` : ""}</p>
+      <div class="bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%"></span></div>
+      <p class="hint">${esc(ds.message || "")}</p></div>`;
+  }
+  if (ds.status === "failed") return `${head}<div class="box ds"><p class="bad">Couldn't make the dataset: ${esc(ds.message)}</p>${form("Try again")}</div>`;
+  const s = ds.summary;
+  const feats = Object.entries(ds.features || {}).filter(([k]) => !["timestamp", "frame_index", "episode_index", "index"].includes(k));
+  return `${head}<div class="box ds">
+    <p><b>${s.episodes} episodes, ${s.frames.toLocaleString()} frames</b> at ${s.fps} fps, ${s.image_size[0]}×${s.image_size[1]} images.
+      ${Math.round(s.success_rate * 100)}% of randomised attempts succeeded (${s.attempts} tried), made in ${Math.round(s.seconds)} s.</p>
+    <div class="actions" style="margin:10px 0">
+      <a class="btn primary" href="/api/runs/${d.id}/dataset/zip" download>Download dataset (LeRobot, zip)</a>
+      <details class="more" style="align-self:center"><summary>Make it again</summary>${form("Regenerate")}</details>
+    </div>
+    <div class="ds-grid">${ds.preview.map(p => `<figure><video src="${p.front}" muted loop autoplay playsinline></video><video src="${p.wrist}" muted loop autoplay playsinline></video><figcaption>Episode ${p.episode}${p.episode === 0 ? " (original layout)" : ""}: front and wrist camera</figcaption></figure>`).join("")}</div>
+    <table style="margin-top:12px"><thead><tr><th>Feature</th><th>Type</th><th>Contents</th></tr></thead><tbody>${feats.map(([k, f]) =>
+      `<tr><td>${esc(k)}</td><td>${esc(f.dtype)}${f.dtype !== "video" && f.shape?.[0] > 1 ? ` [${f.shape[0]}]` : ""}</td><td class="why">${esc(f.dtype === "video" ? `${f.shape[1]}×${f.shape[0]} RGB` : (f.names || []).join(", "))}</td></tr>`).join("")}</tbody></table>
+  </div>`;
+}
+
+async function loadDataset() {
+  clearTimeout(state.dsTimer);
+  if (!state.detail || state.detail.status !== "done") { state.ds = null; return; }
+  try { state.ds = await api(`/api/runs/${state.current}/dataset`); } catch { state.ds = null; }
+  if (state.ds?.status === "running") state.dsTimer = setTimeout(async () => { await loadDataset(); render(); }, 1500);
 }
 
 function film(frames) {
@@ -548,6 +605,10 @@ $("#main").addEventListener("click", async e => {
   try {
     if (act === "stop") await api(`/api/runs/${id}/stop`, { method: "POST" });
     if (act === "replay") await api(`/api/runs/${id}/replay` + (state.round ? `?iteration=${state.round}` : ""), { method: "POST" });
+    if (act === "dataset") {
+      const n = Math.max(1, Math.min(1000, +($("#dsEpisodes")?.value || 50)));
+      await api(`/api/runs/${id}/dataset?episodes=${n}`, { method: "POST" });
+    }
     if (act === "delete") {
       if (!confirm("Delete this run and all its files?")) return;
       await api(`/api/runs/${id}`, { method: "DELETE" });

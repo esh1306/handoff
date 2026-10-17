@@ -30,6 +30,7 @@ RUNS = HERE / "runs"
 RUNS.mkdir(exist_ok=True)
 PY = sys.executable
 SAMPLES = HERE / "samples"
+DATASETS = HERE / "datasets"
 MODELS = [  # (id, what it's good for); the first available one is the default
     ("gpt-6-astra", "OpenAI's most capable model, best at spatial reasoning (slower, priciest)"),
     ("gpt-6.1-sol", "OpenAI's balanced model, faster and about 5x cheaper"),
@@ -260,6 +261,57 @@ def replay(run_id: str, iteration: int | None = None):
     return {"ok": True}
 
 
+@app.post("/api/runs/{run_id}/dataset")
+def make_dataset(run_id: str, episodes: int = 50):
+    """Generate a LeRobot training dataset from the run (domain-randomised re-simulations)."""
+    p = run_path(run_id)
+    if not (p / "final.json").exists():
+        raise HTTPException(400, "Finish the run first")
+    key = f"dataset:{run_id}"
+    if key in procs and procs[key].poll() is None:
+        raise HTTPException(409, "Already making a dataset for this run")
+    DATASETS.mkdir(exist_ok=True)
+    (DATASETS / f"{run_id}.progress.json").write_text(json.dumps(
+        {"status": "running", "message": "starting", "kept": 0, "tried": 0, "target": episodes}))
+    log = open(DATASETS / f"{run_id}.log", "w", encoding="utf-8")
+    procs[key] = subprocess.Popen([PY, str(HERE / "dataset.py"), str(p), "--episodes", str(max(1, min(episodes, 1000)))],
+                                  cwd=HERE, stdout=log, stderr=subprocess.STDOUT)
+    return {"ok": True}
+
+
+@app.get("/api/runs/{run_id}/dataset")
+def dataset_status(run_id: str):
+    run_path(run_id)
+    prog = read_json(DATASETS / f"{run_id}.progress.json")
+    if prog is None:
+        return {"status": "none"}
+    proc = procs.get(f"dataset:{run_id}")
+    if prog.get("status") == "running" and (proc is None or proc.poll() is not None):
+        log = DATASETS / f"{run_id}.log"
+        tail = log.read_text(encoding="utf-8", errors="replace")[-600:] if log.exists() else ""
+        prog = {"status": "failed", "message": tail.strip().splitlines()[-1] if tail.strip() else "stopped"}
+    out = {**prog}
+    gen = read_json(DATASETS / run_id / "generation.json")
+    if prog.get("status") == "done" and gen:
+        n = min(gen["episodes"], 4)
+        out["summary"] = {k: v for k, v in gen.items() if k != "episodes_detail"}
+        out["preview"] = [{"episode": e, "front": f"/datasets/{run_id}/videos/chunk-000/observation.images.front/episode_{e:06d}.mp4",
+                           "wrist": f"/datasets/{run_id}/videos/chunk-000/observation.images.wrist/episode_{e:06d}.mp4"}
+                          for e in range(n)]
+        out["features"] = read_json(DATASETS / run_id / "meta" / "info.json", {}).get("features")
+    return out
+
+
+@app.get("/api/runs/{run_id}/dataset/zip")
+def dataset_zip(run_id: str):
+    run_path(run_id)
+    d = DATASETS / run_id
+    if not (d / "meta" / "info.json").exists():
+        raise HTTPException(404, "No dataset for this run yet")
+    archive = shutil.make_archive(str(Path(tempfile.mkdtemp()) / f"{run_id}-lerobot"), "zip", d)
+    return FileResponse(archive, filename=f"{run_id}-lerobot.zip")
+
+
 @app.get("/api/runs/{run_id}/zip")
 def download(run_id: str):
     p = run_path(run_id)
@@ -282,6 +334,8 @@ def delete_run(run_id: str):
 app.mount("/runs", StaticFiles(directory=RUNS), name="runs")
 SAMPLES.mkdir(exist_ok=True)
 app.mount("/samples", StaticFiles(directory=SAMPLES), name="samples")
+DATASETS.mkdir(exist_ok=True)
+app.mount("/datasets", StaticFiles(directory=DATASETS), name="datasets")
 
 if __name__ == "__main__":
     import argparse

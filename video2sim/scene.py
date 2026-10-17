@@ -1,6 +1,7 @@
 """Turn a scene spec (JSON from the model) into a compiled MuJoCo model."""
 import math
 import mujoco
+import numpy as np
 
 from robots import Robot
 
@@ -66,7 +67,7 @@ def _add_object(world, o):
     if not o.get("fixed", False):
         body.add_freejoint()
     rgba = o.get("rgba", [0.6, 0.6, 0.6, 1])
-    common = dict(rgba=rgba, condim=4, friction=[1.2, 0.005, 0.0001])
+    common = dict(rgba=rgba, condim=4, friction=[o.get("friction", 1.2), 0.005, 0.0001])
     s, shape = o["size"], o["shape"]
 
     if shape == "container":  # open-top box: floor + four walls
@@ -86,6 +87,18 @@ def _add_object(world, o):
     body.add_geom(type=gtype, size=size, mass=o.get("mass", 0.05), **common)
 
 
+def _look_at(pos, target, up):
+    """Quaternion for a MuJoCo camera at pos looking at target (cameras look along -z, +y is image up)."""
+    z = np.asarray(pos, float) - np.asarray(target, float)
+    z /= np.linalg.norm(z)
+    x = np.cross(up, z)
+    x /= np.linalg.norm(x)
+    y = np.cross(z, x)
+    q = np.zeros(4)
+    mujoco.mju_mat2Quat(q, np.column_stack([x, y, z]).flatten())
+    return q.tolist()
+
+
 def build(spec, robot: Robot):
     """Return (MjModel, MjSpec) for the robot plus the spec's objects on a table at z=0."""
     ms = mujoco.MjSpec.from_file(str(robot.xml))
@@ -96,6 +109,9 @@ def build(spec, robot: Robot):
     ms.visual.global_.offheight = 960
     ms.body(robot.tcp_body).add_site(name="tcp", pos=list(robot.tcp_pos), size=[0.006] * 3,
                                      rgba=[1, 1, 0, 1], group=4)
+    if robot.wrist_cam:
+        pos, target, up = robot.wrist_cam
+        ms.body(robot.tcp_body).add_camera(name="wrist", pos=list(pos), quat=_look_at(pos, target, up), fovy=70)
 
     world = ms.worldbody
     world.add_light(pos=[0, 0, 3], dir=[0, 0, -1], diffuse=[0.7, 0.7, 0.7])
