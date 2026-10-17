@@ -41,6 +41,7 @@ class Sim:
         self.record = video_path is not None
         self.fps = fps
         self.writer = None
+        self.mirrored = False
         if self.record:
             # H.264 so browsers can play it
             self.writer = imageio_ffmpeg.write_frames(str(video_path), (size[1], size[0]), fps=fps,
@@ -50,9 +51,15 @@ class Sim:
             self.cam = mujoco.MjvCamera()
             self.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
             cam = {**DEFAULT_CAMERA, **(spec.get("camera") or {})}
+            az = cam["azimuth"]
+            if math.cos(math.radians(az)) > 0.3:
+                # Camera behind the robot (looking along +x): its body would hide the task,
+                # so film it from the front instead. Left and right appear swapped.
+                az = 180 - az
+                self.mirrored = True
             self.cam.lookat[:] = cam["lookat"]
             self.cam.distance, self.cam.azimuth, self.cam.elevation = (
-                cam["distance"], cam["azimuth"], cam["elevation"])
+                max(cam["distance"], 1.2), az, cam["elevation"])
         self.keyframes = []   # (label, RGB) at the end of each plan step
         self.reset()
 
@@ -186,7 +193,8 @@ class Sim:
             self.keyframes.append(("sim initial state", self.render()))
         for i, step in enumerate(plan):
             a = step["action"]
-            info = {"i": i, "action": a, "language": step.get("language", "")}
+            # sim time == time in sim.mp4, so the UI can follow the steps while the video plays
+            info = {"i": i, "action": a, "language": step.get("language", ""), "t_start": round(self.d.time, 2)}
             if a in ("move_to", "move_by"):
                 goal = (step["pos"] if a == "move_to"
                         else self.target + np.asarray(step["delta_cm"], float) / 100)
@@ -200,6 +208,7 @@ class Sim:
             elif a == "wait":
                 self.hold(float(step.get("seconds", 0.5)))
             info["grasped"] = self.grasped()
+            info["t_end"] = round(self.d.time, 2)
             steps.append(info)
             if self.record:
                 self.keyframes.append((f"sim after step {i}: {a} {step.get('language', '')}".strip(),
@@ -218,9 +227,14 @@ class Sim:
                     "max_lift_cm": round(100 * (self.max_z[n] - self.initial[n][2]), 1)}
                 for n in self.objects}
         checks = [self.check(c, final) for c in self.spec["success"]]
-        return {"steps": steps, "objects": objs, "success": checks,
-                "all_success": bool(checks) and all(c["passed"] for c in checks),
-                "sim_seconds": round(d.time, 2)}
+        out = {"steps": steps, "objects": objs, "success": checks,
+               "all_success": bool(checks) and all(c["passed"] for c in checks),
+               "sim_seconds": round(d.time, 2)}
+        if self.mirrored:
+            out["camera_note"] = ("Your camera would have been behind the robot, so the simulation frames "
+                                  "are filmed from the front: left and right are swapped compared with the "
+                                  "video. Judge the layout from the object positions, not the image.")
+        return out
 
     def check(self, c, final):
         o = c["object"]

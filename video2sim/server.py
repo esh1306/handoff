@@ -17,6 +17,7 @@ import tempfile
 import time
 from pathlib import Path
 
+import imageio_ffmpeg
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -39,6 +40,14 @@ MODELS = [  # (id, what it's good for); the first available one is the default
 
 app = FastAPI(title="video2sim")
 procs: dict[str, subprocess.Popen] = {}
+
+
+def to_web_mp4(src, dst):
+    """Phone clips (HEVC .mov, rotation metadata) -> upright 720p H.264 any browser and OpenCV can read."""
+    subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-i", str(src),
+                    "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
+                    "-vf", "scale=-2:'min(720,ih)'", "-movflags", "+faststart", str(dst)],
+                   check=True, capture_output=True)
 
 
 def run_path(run_id):
@@ -104,6 +113,12 @@ def has_key(prov):
     return bool(os.environ.get(KEY_ENV[prov]) or (prov == "gemini" and os.environ.get("GOOGLE_API_KEY")))
 
 
+@app.get("/demo", response_class=HTMLResponse)
+def demo_page():
+    """Presenter view: /demo#<run id>"""
+    return (HERE / "static" / "demo.html").read_text(encoding="utf-8")
+
+
 @app.get("/api/config")
 def config():
     models = [{"id": m, "about": about, "available": has_key(resolve_provider(m))} for m, about in MODELS]
@@ -140,14 +155,19 @@ async def start_run(video: UploadFile | None = File(None), sample: str = Form(""
     run_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(2)
     run_dir = RUNS / run_id
     run_dir.mkdir()
+    video_file = run_dir / "input.mp4"
     if sample_file:
-        video_file = run_dir / "input.mp4"
         shutil.copyfile(sample_file, video_file)
     else:
         ext = Path(video.filename or "video.mp4").suffix.lower() or ".mp4"
-        video_file = run_dir / f"input{ext}"
-        with open(video_file, "wb") as f:
+        original = run_dir / f"original{ext}"
+        with open(original, "wb") as f:
             shutil.copyfileobj(video.file, f)
+        try:
+            await asyncio.to_thread(to_web_mp4, original, video_file)
+        except subprocess.CalledProcessError as e:
+            shutil.rmtree(run_dir)
+            raise HTTPException(400, f"Couldn't read that video: {e.stderr.decode(errors='replace')[-300:]}")
     env = os.environ.copy()
 
     cmd = [PY, str(HERE / "loop.py"), "--video", str(video_file), "--robot", robot,

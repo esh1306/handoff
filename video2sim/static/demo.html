@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>video2sim demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light dark;
+  --paper: #e9edf0; --panel: #f7f9fa; --ink: #1d2a35; --muted: #5d6b77; --line: #cfd7dd;
+  --blue: #2a56d6; --blue-ink: #fff; --pass: #1d7f46; --fail: #b93a26; --now: #a8740a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #141a20; --panel: #1b232a; --ink: #e3e9ee; --muted: #93a2ae; --line: #2c3842;
+    --blue: #6f93ff; --blue-ink: #0d1420; --pass: #4cc483; --fail: #ff7a63; --now: #e2b049;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #141a20; --panel: #1b232a; --ink: #e3e9ee; --muted: #93a2ae; --line: #2c3842;
+  --blue: #6f93ff; --blue-ink: #0d1420; --pass: #4cc483; --fail: #ff7a63; --now: #e2b049;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--paper); color: var(--ink); font: 17px/1.45 "Archivo", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.stage { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 18px; height: 100vh; padding: 24px 32px; max-width: 1800px; margin: 0 auto; }
+@media (max-width: 900px) { .stage { height: auto; padding: 16px; } }
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+h1 { margin: 0; font-size: clamp(26px, 3vw, 44px); line-height: 1.05; font-weight: 780; font-variation-settings: "wdth" 115; letter-spacing: -0.01em; max-width: 28ch; }
+.sub { color: var(--muted); margin-top: 6px; }
+.verdict { padding: 8px 16px; border-radius: 99px; font-weight: 650; border: 2px solid currentColor; white-space: nowrap; }
+.verdict.pass { color: var(--pass); } .verdict.fail { color: var(--fail); }
+
+.body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(280px, 0.62fr); gap: 18px; min-height: 0; }
+@media (max-width: 1200px) { .body { grid-template-columns: 1fr 1fr; } .steps { grid-column: 1 / -1; max-height: 50vh; } }
+@media (max-width: 700px) { .body { grid-template-columns: 1fr; } }
+figure { margin: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+figcaption { font-weight: 700; font-size: 19px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+figcaption span { color: var(--muted); font-weight: 400; font-size: 15px; }
+video { width: 100%; height: 100%; min-height: 200px; object-fit: contain; background: #000; border-radius: 10px; display: block; }
+
+.steps { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+.steps h2 { margin: 0; padding: 12px 16px; font-size: 17px; border-bottom: 1px solid var(--line); }
+.steps ol { list-style: none; margin: 0; padding: 6px; overflow-y: auto; counter-reset: s; }
+.steps li { counter-increment: s; }
+.steps button { width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 9px 10px 9px 40px; cursor: pointer; position: relative; display: block; }
+.steps button::before { content: counter(s); position: absolute; left: 10px; top: 9px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--muted); color: var(--muted); font-size: 12px; display: grid; place-items: center; }
+.steps b { display: block; font-weight: 650; font-size: 16px; }
+.steps small { display: block; color: var(--muted); font-size: 14px; line-height: 1.35; }
+.steps .done::before { border-color: var(--pass); color: var(--pass); }
+.steps .now { background: color-mix(in srgb, var(--now) 16%, transparent); }
+.steps .now::before { border-color: var(--now); background: var(--now); color: var(--panel); }
+.steps .hold { color: var(--pass); font-size: 13px; }
+
+footer { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 10px 18px; cursor: pointer; font-weight: 600; }
+.btn.primary { background: var(--blue); color: var(--blue-ink); border-color: var(--blue); }
+.btn:hover { border-color: var(--ink); }
+.btn.primary:hover { border-color: var(--blue); filter: brightness(1.08); }
+footer .hint { color: var(--muted); font-size: 14px; margin-left: auto; }
+.msg { max-width: 560px; margin: 20vh auto; text-align: center; }
+.msg a { color: var(--blue); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const nice = s => String(s || "").replace(/_/g, " ");
+
+function checkLine(c) {
+  const o = nice(c.object);
+  if (c.type === "object_on") return c.passed ? `${o} ended up in the ${nice(c.support)}` : `${o} missed the ${nice(c.support)}`;
+  if (c.type === "object_lifted") return c.passed ? `${o} lifted` : `${o} not lifted`;
+  return c.passed ? `${o} reached its spot` : `${o} missed its spot`;
+}
+
+async function main() {
+  const id = location.hash.slice(1);
+  if (!id) return message("Open a run from the workbench and press Present.");
+  let d;
+  try {
+    const r = await fetch(`/api/runs/${id}`);
+    if (!r.ok) throw new Error((await r.json()).detail);
+    d = await r.json();
+  } catch (e) { return message(`Can't open this run: ${esc(e.message)}`); }
+  const n = d.final?.iteration || d.iterations.length;
+  const it = d.iterations[n - 1];
+  if (!it?.metrics?.steps) return message(d.status === "running" ? "This run is still going. Reload when it finishes." : "This run has no simulation to show.");
+
+  const m = it.metrics, plan = it.spec.plan;
+  const pass = m.all_success;
+  $("#app").innerHTML = `<div class="stage">
+    <header>
+      <div>
+        <h1>${esc(it.spec.task_description || d.task)}</h1>
+        <div class="sub">${esc(d.config.model)} watched the video and wrote the robot's plan. MuJoCo ran it with real physics${n > 1 ? `, and the model fixed it over ${n} rounds` : ""}.</div>
+      </div>
+      <div class="verdict ${pass ? "pass" : "fail"}" title="${esc(m.success.map(checkLine).join("; "))}">${pass ? "Robot completed the task" : "Robot did not complete it"}</div>
+    </header>
+    <div class="body">
+      <figure><figcaption>Person <span>your recording</span></figcaption><video id="vPerson" src="${d.input_video}" muted playsinline preload="auto"></video></figure>
+      <figure><figcaption>Robot <span>${m.camera_note ? "seen from the front, so left and right are swapped" : `Franka in MuJoCo, round ${n}`}</span></figcaption><video id="vRobot" src="${it.video}" muted playsinline preload="auto"></video></figure>
+      <section class="steps" aria-label="Robot plan">
+        <h2>What the robot is doing</h2>
+        <ol>${plan.map((s, i) => {
+          const r = m.steps[i] || {};
+          return `<li><button data-i="${i}" data-t="${r.t_start ?? 0}"><b>${esc(s.language || s.action)}</b><small>${esc(s.reason)}</small>${r.grasped?.length ? `<small class="hold">holding ${esc(r.grasped.map(nice).join(", "))}</small>` : ""}</button></li>`;
+        }).join("")}</ol>
+      </section>
+    </div>
+    <footer>
+      <button class="btn primary" id="play">Play both</button>
+      <button class="btn" id="restart">Restart</button>
+      <a class="btn" href="/#${esc(id)}" style="text-decoration:none">Back to workbench</a>
+      <span class="hint">Space plays or pauses. Click a step to jump the robot to it.</span>
+    </footer>
+  </div>`;
+
+  const person = $("#vPerson"), robot = $("#vRobot"), btn = $("#play");
+  const buttons = [...document.querySelectorAll(".steps button")];
+  const playing = () => !robot.paused || !person.paused;
+  const setLabel = () => { btn.textContent = playing() ? "Pause" : "Play both"; };
+  const toggle = () => {
+    if (playing()) { person.pause(); robot.pause(); }
+    else { if (person.ended) person.currentTime = 0; if (robot.ended) robot.currentTime = 0; person.play(); robot.play(); }
+    setTimeout(setLabel, 0);
+  };
+  const restart = () => { person.currentTime = 0; robot.currentTime = 0; person.play(); robot.play(); setTimeout(setLabel, 0); };
+  btn.onclick = toggle;
+  $("#restart").onclick = restart;
+  [person, robot].forEach(v => { v.onpause = setLabel; v.onplay = setLabel; });
+  document.addEventListener("keydown", e => { if (e.code === "Space" && e.target.tagName !== "BUTTON") { e.preventDefault(); toggle(); } });
+
+  let current = -1;
+  robot.ontimeupdate = () => {
+    const t = robot.currentTime;
+    let idx = -1;
+    m.steps.forEach((s, i) => { if (t >= s.t_start - 0.05) idx = i; });
+    if (idx === current) return;
+    current = idx;
+    buttons.forEach((b, i) => {
+      b.classList.toggle("now", i === idx);
+      b.classList.toggle("done", i < idx);
+      if (i === idx) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+    });
+    buttons[idx]?.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  };
+  buttons.forEach(b => b.onclick = () => { robot.currentTime = +b.dataset.t + 0.01; robot.play(); setTimeout(setLabel, 0); });
+}
+
+function message(html) { $("#app").innerHTML = `<div class="msg"><p>${html}</p><p><a href="/">Go to the workbench</a></p></div>`; }
+main();
+</script>
+</body>
+</html>

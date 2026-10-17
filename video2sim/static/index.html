@@ -55,6 +55,10 @@ form { display: grid; gap: 18px; }
 .upload { grid-column: 2; font-size: 12.5px; color: var(--muted); }
 .upload input { max-width: 100%; margin-top: 4px; font-size: 12.5px; }
 details.more summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+.film-guide { font-size: 13px; padding: 2px 2px 0; }
+.film-guide ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--muted); }
+.film-guide b { color: var(--ink); font-weight: 600; }
+.btn.present { background: var(--ink); color: var(--panel); border-color: var(--ink); font-weight: 600; }
 details.more[open] summary { margin-bottom: 10px; }
 label.f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
 input[type=number], textarea { width: 100%; padding: 7px 9px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; }
@@ -244,9 +248,19 @@ function setupForm() {
     </label>`).join("") + `
     <label class="choice"><input type="radio" name="source" value="upload" ${c.samples.length ? "" : "checked"}>
       <b>My own video</b>
-      <span class="upload">A short clip (5 to 30 s) of a person doing a tabletop task, filmed from the side.
+      <span class="upload">A 10 to 20 s phone clip of one hand doing a tabletop task. Phone .mov files are fine.
         <input type="file" id="video" accept="video/*"></span>
-    </label>`;
+    </label>
+    <details class="more film-guide"><summary>How to film it so the robot can copy it</summary>
+      <ul>
+        <li><b>Phone on a tripod or a stack of books</b>, 1 to 1.5 m away, looking at the table from the side and a little above. Don't move it.</li>
+        <li><b>One hand, one object, one destination</b>: pick something up and put it in or on something else. Pick-and-place works best.</li>
+        <li><b>Small, solid, brightly coloured objects</b> on a plain table: a block, a small box, a ball or a lemon, into a bowl, cup or tray. The robot's gripper opens 8 cm, so the thing it picks up must be narrower than that.</li>
+        <li><b>Start with your hand out of the way</b>, move slowly and clearly, then pull your hand back at the end.</li>
+        <li>Good, even light. Avoid shiny, see-through or very dark objects, and keep everything else off the table.</li>
+        <li>Say what you're doing in <b>Describe the task</b> under More options. It helps the model a lot.</li>
+      </ul>
+    </details>`;
   $("#video").addEventListener("change", () => { $('input[value="upload"]').checked = true; });
 
   $("#robotChoices").innerHTML = Object.keys(c.robots).map((k, i) => `
@@ -437,6 +451,7 @@ function render() {
       </div>
       <div class="actions">
         ${running ? `<button class="btn danger" data-act="stop">Stop</button>` : ""}
+        ${d.iterations.some(r => r.metrics?.steps) && !running ? `<a class="btn present" href="/demo#${d.id}" target="_blank">Present</a>` : ""}
         ${d.iterations.length ? `<button class="btn" data-act="replay" title="Opens an interactive MuJoCo window on this computer">Watch in 3D</button>` : ""}
         <a class="btn" href="/api/runs/${d.id}/zip" download>Download files</a>
         ${!running ? `<button class="btn danger" data-act="delete">Delete</button>` : ""}
