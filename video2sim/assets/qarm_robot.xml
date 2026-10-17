@@ -1,0 +1,55 @@
+<mujoco model="qarm">
+  <!-- QArm-like arm only (no scene). Roll-pitch-pitch-roll.
+       Base 0.14, upper arm 0.35 (+0.05 forward offset), forearm 0.25, end effector 0.15. -->
+  <compiler angle="radian"/>
+  <option timestep="0.002" integrator="implicitfast"/>
+
+  <default>
+    <joint damping="1" armature="0.05"/>
+    <geom density="400" rgba=".92 .92 .95 1"/>
+    <default class="visual"><geom contype="0" conaffinity="0"/></default>
+  </default>
+
+  <worldbody>
+    <geom class="visual" type="cylinder" size=".09 .015" pos="0 0 .015" rgba=".25 .25 .28 1"/>
+    <body name="base" pos="0 0 0" gravcomp="1">
+      <joint name="base_yaw" axis="0 0 1" range="-2.97 2.97"/>
+      <geom type="cylinder" size=".055 .06" pos="0 0 .08" rgba=".2 .2 .24 1"/>
+
+      <body name="upper_arm" pos="0 0 .14" gravcomp="1">
+        <joint name="shoulder" axis="0 1 0" range="-1.48 1.48"/>
+        <geom class="visual" type="sphere" size=".045" rgba=".1 .35 .85 1"/>
+        <geom type="capsule" fromto="0 0 0 .05 0 .35" size=".032"/>
+
+        <body name="forearm" pos=".05 0 .35" gravcomp="1">
+          <joint name="elbow" axis="0 1 0" range="-1.66 1.31"/>
+          <geom class="visual" type="sphere" size=".04" rgba=".1 .35 .85 1"/>
+          <geom type="capsule" fromto="0 0 0 .25 0 0" size=".028"/>
+
+          <body name="wrist" pos=".25 0 0" gravcomp="1">
+            <joint name="wrist_roll" axis="1 0 0" range="-2.79 2.79"/>
+            <geom type="box" size=".04 .035 .025" pos=".04 0 0" rgba=".1 .35 .85 1"/>
+
+            <body name="finger_l" pos=".125 .04 0" gravcomp="1">
+              <joint name="finger_l" type="slide" axis="0 -1 0" range="0 .03" damping="5"/>
+              <geom type="box" size=".03 .005 .015" rgba=".15 .15 .15 1" friction="2 .01 .001" condim="4"/>
+            </body>
+            <body name="finger_r" pos=".125 -.04 0" gravcomp="1">
+              <joint name="finger_r" type="slide" axis="0 1 0" range="0 .03" damping="5"/>
+              <geom type="box" size=".03 .005 .015" rgba=".15 .15 .15 1" friction="2 .01 .001" condim="4"/>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position name="base_yaw"   joint="base_yaw"   kp="400" kv="40" ctrlrange="-2.97 2.97"/>
+    <position name="shoulder"   joint="shoulder"   kp="600" kv="60" ctrlrange="-1.48 1.48"/>
+    <position name="elbow"      joint="elbow"      kp="400" kv="40" ctrlrange="-1.66 1.31"/>
+    <position name="wrist_roll" joint="wrist_roll" kp="50"  kv="5"  ctrlrange="-2.79 2.79"/>
+    <position name="finger_l"   joint="finger_l"   kp="300" kv="20" ctrlrange="0 .03"/>
+    <position name="finger_r"   joint="finger_r"   kp="300" kv="20" ctrlrange="0 .03"/>
+  </actuator>
+</mujoco>

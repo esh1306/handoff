@@ -1,0 +1,10 @@
+mujoco
+numpy
+opencv-python
+imageio-ffmpeg
+fastapi
+uvicorn
+python-multipart
+openai
+anthropic
+google-genai

@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>video2sim workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light dark;
+  --paper: #e9edf0; --panel: #f7f9fa; --ink: #1d2a35; --muted: #5d6b77; --line: #cfd7dd;
+  --blue: #2a56d6; --blue-ink: #ffffff; --pass: #1d7f46; --fail: #b93a26; --run: #a8740a;
+  --chip: #dde4e9; --code: #eef2f4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #141a20; --panel: #1b232a; --ink: #e3e9ee; --muted: #93a2ae; --line: #2c3842;
+    --blue: #6f93ff; --blue-ink: #0d1420; --pass: #4cc483; --fail: #ff7a63; --run: #e2b049;
+    --chip: #26313a; --code: #161d23;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #141a20; --panel: #1b232a; --ink: #e3e9ee; --muted: #93a2ae; --line: #2c3842;
+  --blue: #6f93ff; --blue-ink: #0d1420; --pass: #4cc483; --fail: #ff7a63; --run: #e2b049;
+  --chip: #26313a; --code: #161d23;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.5 "Archivo", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+h1, h2, h3 { margin: 0; }
+
+.app { display: grid; grid-template-columns: 360px minmax(0, 1fr); min-height: 100vh; }
+@media (max-width: 900px) { .app { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- setup rail ---------- */
+.rail { background: var(--panel); border-right: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+@media (max-width: 900px) { .rail { border-right: 0; border-bottom: 1px solid var(--line); } }
+.brand { font-size: 26px; font-weight: 800; font-variation-settings: "wdth" 125; letter-spacing: -0.02em; }
+.brand + p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+form { display: grid; gap: 18px; }
+.q { display: grid; gap: 8px; }
+.q > h3 { font-size: 14px; font-weight: 650; }
+.choices { display: grid; gap: 6px; }
+.choice { position: relative; display: grid; grid-template-columns: 18px 1fr; gap: 2px 10px; align-items: start; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; background: var(--paper); }
+.choice input { margin: 3px 0 0; accent-color: var(--blue); }
+.choice b { font-weight: 600; font-size: 14px; }
+.choice small { grid-column: 2; color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.choice:has(input:checked) { border-color: var(--blue); box-shadow: inset 0 0 0 1px var(--blue); }
+.choice:has(input:disabled) { opacity: .5; cursor: not-allowed; }
+.choice video { grid-column: 1 / -1; width: 100%; border-radius: 4px; margin-top: 6px; background: #000; aspect-ratio: 16/9; object-fit: cover; }
+.upload { grid-column: 2; font-size: 12.5px; color: var(--muted); }
+.upload input { max-width: 100%; margin-top: 4px; font-size: 12.5px; }
+details.more summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+details.more[open] summary { margin-bottom: 10px; }
+label.f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+input[type=number], textarea { width: 100%; padding: 7px 9px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; }
+textarea { resize: vertical; min-height: 50px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 7px 12px; cursor: pointer; text-decoration: none; color: var(--ink); font-size: 14px; }
+.btn:hover { border-color: var(--ink); }
+.btn.primary { background: var(--blue); color: var(--blue-ink); border-color: var(--blue); font-weight: 650; padding: 11px; font-size: 15px; }
+.btn.primary:disabled { opacity: .5; cursor: progress; }
+.btn.danger:hover { border-color: var(--fail); color: var(--fail); }
+.error { color: var(--fail); font-size: 13px; margin: 0; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+.runs h3 { font-size: 14px; font-weight: 650; margin-bottom: 6px; }
+.runs ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.runs button { width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 6px; padding: 7px 8px; cursor: pointer; display: grid; grid-template-columns: 10px 1fr; gap: 0 8px; align-items: center; }
+.runs button:hover { background: var(--chip); }
+.runs button[aria-current="true"] { border-color: var(--line); background: var(--paper); }
+.runs .t { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.runs .m { grid-column: 2; font-size: 12px; color: var(--muted); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.s-running { background: var(--run); animation: pulse 1.2s infinite; }
+.s-done { background: var(--pass); } .s-failed { background: var(--fail); }
+@keyframes pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .s-running { animation: none; } }
+
+/* ---------- main ---------- */
+main { padding: 26px 30px 70px; min-width: 0; max-width: 1400px; }
+.intro { max-width: 640px; margin: 8vh 0 0; }
+.intro h2 { font-size: 36px; line-height: 1.08; font-variation-settings: "wdth" 118; font-weight: 760; margin-bottom: 14px; }
+.intro p { color: var(--muted); max-width: 60ch; }
+.how { list-style: none; padding: 0; margin: 22px 0; display: grid; gap: 12px; counter-reset: s; }
+.how li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; }
+.how li::before { content: counter(s); width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--ink); display: grid; place-items: center; font-weight: 700; }
+.how b { display: block; }
+.how span { color: var(--muted); font-size: 14px; }
+
+.head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.head h2 { font-size: 26px; line-height: 1.15; font-weight: 750; font-variation-settings: "wdth" 112; max-width: 36ch; }
+.meta { color: var(--muted); font-size: 13.5px; margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* live tracker: the loop is a real sequence, so it is numbered */
+.track { margin: 22px 0 6px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); }
+@media (max-width: 700px) { .track { grid-template-columns: 1fr; } }
+.stage { padding: 12px 14px; border-right: 1px solid var(--line); position: relative; }
+.stage:last-child { border-right: 0; }
+.stage b { display: block; font-size: 14px; font-weight: 650; }
+.stage small { color: var(--muted); font-size: 12.5px; }
+.stage .n { font-size: 12px; color: var(--muted); }
+.stage.active { background: color-mix(in srgb, var(--run) 14%, var(--panel)); }
+.stage.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--run); }
+.stage.done .n::after { content: " ✓"; color: var(--pass); }
+.stage.failed { background: color-mix(in srgb, var(--fail) 12%, var(--panel)); }
+.now { margin: 8px 0 0; font-size: 14.5px; }
+.now time { color: var(--muted); }
+
+.verdict { margin: 24px 0 14px; padding: 16px 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); border-left: 6px solid var(--muted); }
+.verdict.pass { border-left-color: var(--pass); } .verdict.fail { border-left-color: var(--fail); }
+.verdict h3 { font-size: 20px; font-weight: 720; font-variation-settings: "wdth" 108; }
+.verdict ul { margin: 8px 0 0; padding-left: 18px; }
+.verdict li { margin: 2px 0; }
+.verdict li.ok::marker { color: var(--pass); } .verdict li.no::marker { color: var(--fail); }
+.verdict .hint { margin-top: 6px; }
+
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 1000px) { .duo { grid-template-columns: 1fr; } }
+.duo figure { margin: 0; }
+.duo figcaption { font-weight: 650; font-size: 14px; margin-bottom: 6px; display: flex; justify-content: space-between; gap: 8px; }
+.duo figcaption span { color: var(--muted); font-weight: 400; font-size: 13px; }
+.duo video { width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 8px; display: block; object-fit: contain; }
+.placeholder { aspect-ratio: 4/3; border-radius: 8px; border: 1.5px dashed var(--line); display: grid; place-items: center; color: var(--muted); font-size: 14px; text-align: center; padding: 20px; }
+
+h3.sec { font-size: 17px; font-weight: 700; margin: 34px 0 10px; }
+.rounds { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.rounds button { width: 100%; text-align: left; cursor: pointer; display: grid; grid-template-columns: 110px 130px 1fr; gap: 12px; align-items: start; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+@media (max-width: 700px) { .rounds button { grid-template-columns: 1fr; } }
+.rounds button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.rounds b { font-weight: 650; }
+.ok { color: var(--pass); } .no { color: var(--fail); }
+.rounds .ch { color: var(--muted); font-size: 13.5px; }
+
+.film { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(140px, 1fr); gap: 6px; overflow-x: auto; padding-bottom: 6px; }
+.film figure { margin: 0; }
+.film img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 4px; display: block; background: var(--chip); cursor: zoom-in; }
+.film figcaption { font-size: 11.5px; color: var(--muted); line-height: 1.3; margin-top: 3px; }
+.strip-title { font-size: 13.5px; font-weight: 600; margin: 12px 0 6px; }
+
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.tabs button { background: none; border: 1px solid var(--line); border-radius: 99px; padding: 5px 14px; cursor: pointer; font-size: 14px; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: auto; max-height: 70vh; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { position: sticky; top: 0; background: var(--panel); color: var(--muted); font-weight: 600; font-size: 12.5px; }
+td.num { text-align: right; white-space: nowrap; }
+td .why { color: var(--muted); font-size: 12.5px; }
+.bad { color: var(--fail); font-weight: 600; }
+pre { margin: 0; padding: 14px; font: 12.5px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; white-space: pre-wrap; word-break: break-word; background: var(--code); }
+.log { list-style: none; margin: 0; padding: 0; }
+.log li { padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13.5px; display: grid; grid-template-columns: 74px 110px 1fr; gap: 10px; }
+.log time { color: var(--muted); }
+
+dialog { border: 0; padding: 0; background: transparent; max-width: 92vw; }
+dialog::backdrop { background: rgb(0 0 0 / .75); }
+dialog img { max-width: 92vw; max-height: 86vh; display: block; border-radius: 6px; }
+dialog p { color: #fff; margin: 6px 0 0; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div>
+      <h1 class="brand">video2sim</h1>
+      <p>Film a person doing a task. Get a robot doing it in simulation.</p>
+    </div>
+
+    <form id="form">
+      <div class="q">
+        <h3>Video of the task</h3>
+        <div class="choices" id="videoChoices"></div>
+      </div>
+      <div class="q">
+        <h3>Robot</h3>
+        <div class="choices" id="robotChoices"></div>
+      </div>
+      <div class="q">
+        <h3>AI model</h3>
+        <div class="choices" id="modelChoices"></div>
+      </div>
+      <details class="more">
+        <summary>More options</summary>
+        <div style="display:grid;gap:10px">
+          <label class="f">Describe the task (optional, helps the model)
+            <textarea name="task" placeholder="e.g. puts the red cube in the bowl"></textarea>
+          </label>
+          <div class="row">
+            <label class="f">Max rounds <input type="number" name="iters" value="5" min="1" max="20"></label>
+            <label class="f">Frames per round <input type="number" name="frames" value="8" min="2" max="24"></label>
+          </div>
+          <p class="hint">Each round costs one model call. The loop stops early once the robot succeeds.</p>
+        </div>
+      </details>
+      <button class="btn primary" id="start" type="submit">Make the robot do it</button>
+      <p class="error" id="formError" role="alert"></p>
+    </form>
+
+    <nav class="runs" aria-label="Past runs">
+      <h3>Past runs</h3>
+      <ul id="runList"></ul>
+    </nav>
+  </aside>
+
+  <main id="main"></main>
+</div>
+
+<dialog id="zoom"><img id="zoomImg" alt=""><p id="zoomCap"></p></dialog>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clock = t => new Date(t * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+const ago = s => s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`;
+const ROBOT_NAMES = {panda: "Franka Panda", qarm: "QArm"};
+const ROBOT_ABOUT = {panda: "7-joint arm, grips from above. Most reliable.", qarm: "Your 4-joint arm. Grips from the side, so some tasks won't work."};
+const nice = s => String(s || "").replace(/_/g, " ");
+
+const state = { config: null, runs: [], current: null, detail: null, round: null, tab: "steps", source: null, timer: null };
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) {
+    let msg = r.statusText;
+    try { msg = (await r.json()).detail || msg; } catch {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+/* ---------- setup form ---------- */
+function setupForm() {
+  const c = state.config;
+  $("#videoChoices").innerHTML = c.samples.map((s, i) => `
+    <label class="choice"><input type="radio" name="source" value="sample:${esc(s.id)}" ${i === 0 ? "checked" : ""}>
+      <b>Sample: ${esc(s.label)}</b><small>A simulated hand doing the task, for trying things out.</small>
+      <video src="${s.src}" muted loop playsinline preload="metadata" onmouseenter="this.play()" onmouseleave="this.pause()"></video>
+    </label>`).join("") + `
+    <label class="choice"><input type="radio" name="source" value="upload" ${c.samples.length ? "" : "checked"}>
+      <b>My own video</b>
+      <span class="upload">A short clip (5 to 30 s) of a person doing a tabletop task, filmed from the side.
+        <input type="file" id="video" accept="video/*"></span>
+    </label>`;
+  $("#video").addEventListener("change", () => { $('input[value="upload"]').checked = true; });
+
+  $("#robotChoices").innerHTML = Object.keys(c.robots).map((k, i) => `
+    <label class="choice"><input type="radio" name="robot" value="${k}" ${i === 0 ? "checked" : ""}>
+      <b>${esc(ROBOT_NAMES[k] || k)}</b><small>${esc(ROBOT_ABOUT[k] || "")}</small></label>`).join("");
+
+  const firstAvail = c.models.find(m => m.available)?.id;
+  $("#modelChoices").innerHTML = c.models.map(m => `
+    <label class="choice"><input type="radio" name="model" value="${esc(m.id)}" ${m.id === firstAvail ? "checked" : ""} ${m.available ? "" : "disabled"}>
+      <b>${esc(m.id)}</b><small>${esc(m.about)}${m.available ? "" : " (no API key on the server)"}</small></label>`).join("");
+
+  $("#form").addEventListener("submit", async e => {
+    e.preventDefault();
+    $("#formError").textContent = "";
+    const fd = new FormData(e.target);
+    const source = fd.get("source");
+    fd.delete("source");
+    if (source === "upload") {
+      const f = $("#video").files[0];
+      if (!f) { $("#formError").textContent = "Choose a video file, or pick the sample."; return; }
+      fd.set("video", f);
+    } else {
+      fd.set("sample", source.slice(7));
+    }
+    const btn = $("#start"); btn.disabled = true; btn.textContent = "Starting…";
+    try {
+      const { id } = await api("/api/runs", { method: "POST", body: fd });
+      await loadRuns();
+      selectRun(id);
+    } catch (err) {
+      $("#formError").textContent = err.message;
+    } finally {
+      btn.disabled = false; btn.textContent = "Make the robot do it";
+    }
+  });
+}
+
+/* ---------- past runs ---------- */
+async function loadRuns() {
+  state.runs = await api("/api/runs");
+  $("#runList").innerHTML = state.runs.length ? state.runs.map(r => `
+    <li><button data-id="${r.id}" aria-current="${r.id === state.current}">
+      <span class="dot s-${r.status}"></span>
+      <span class="t">${esc(r.task || (r.status === "running" ? "Running…" : "Untitled run"))}</span>
+      <span class="m">${esc(ROBOT_NAMES[r.robot] || r.robot)}, ${esc(r.model)}, ${r.status === "running" ? "running" : r.all_success ? "succeeded" : r.status === "failed" ? "error" : r.status === "stopped" ? "stopped" : "did not succeed"}</span>
+    </button></li>`).join("") : `<li class="hint">Nothing yet. Your runs will show up here.</li>`;
+}
+$("#runList").addEventListener("click", e => {
+  const b = e.target.closest("button[data-id]");
+  if (b) selectRun(b.dataset.id);
+});
+
+async function selectRun(id) {
+  if (state.source) { state.source.close(); state.source = null; }
+  state.current = id; state.round = null; state.detail = null;
+  history.replaceState(null, "", "#" + id);
+  await refresh();
+  if (state.detail?.status === "running") {
+    const es = new EventSource(`/api/runs/${id}/events?start=${state.detail.events.length}`);
+    let pending = null;
+    es.onmessage = () => { clearTimeout(pending); pending = setTimeout(refresh, 200); };
+    es.addEventListener("end", () => { es.close(); refresh(); loadRuns(); });
+    state.source = es;
+  }
+  loadRuns();
+}
+
+async function refresh() {
+  if (!state.current) return renderIntro();
+  try {
+    const prev = state.detail?.iterations?.length ?? 0;
+    state.detail = await api(`/api/runs/${state.current}`);
+    const n = state.detail.iterations.length;
+    if (state.round === null || (state.round === prev && n > prev)) state.round = n;  // follow the newest round
+    render();
+  } catch (err) {
+    $("#main").innerHTML = `<div class="intro"><h2>This run can't be opened</h2><p>${esc(err.message)}</p></div>`;
+  }
+}
+
+/* ---------- intro ---------- */
+function renderIntro() {
+  $("#main").innerHTML = `<div class="intro">
+    <h2>Show the AI a person doing a task, and it builds a robot simulation of the same task.</h2>
+    <p>It works like the real2sim demos in Google's Gemini Argon post: the model keeps checking its simulation against your video and fixing it until the robot gets it right.</p>
+    <ol class="how">
+      <li><div><b>The model watches your video</b><span>It works out the objects (shape, size, colour, position) and what the person's hand did.</span></div></li>
+      <li><div><b>It writes a scene and a robot plan</b><span>Steps like "move above the cube, move down 12 cm, close gripper", each with a reason.</span></div></li>
+      <li><div><b>MuJoCo runs it with real physics</b><span>The robot really has to grip and carry things. We measure whether the task succeeded.</span></div></li>
+      <li><div><b>The model compares and fixes</b><span>It sees the simulation next to your video plus the measurements, then tries again.</span></div></li>
+    </ol>
+    <p>To try it, keep the sample video selected and press <b>Make the robot do it</b>.</p>
+  </div>`;
+}
+
+/* ---------- what is happening right now ---------- */
+function progress(d) {
+  const ev = d.events, last = ev[ev.length - 1] || {};
+  const stages = [
+    {k: "watch", b: "Watch video", s: "Pull frames from your clip"},
+    {k: "plan", b: "Plan", s: "Model writes scene and moves"},
+    {k: "sim", b: "Simulate", s: "Robot tries it in MuJoCo"},
+    {k: "fix", b: "Compare and fix", s: "Model checks against video"},
+    {k: "done", b: "Result", s: ""},
+  ];
+  let active = "watch", now = "Starting up…";
+  const round = ev.filter(e => e.type === "iteration").length;
+  if (last.type === "frames") { active = "plan"; now = "Frames ready, sending them to the model."; }
+  if (last.type === "model_call") {
+    const first = last.stage === "analyse";
+    active = first ? "plan" : "fix";
+    now = first ? `${d.config.model} is watching your video and planning the robot's moves. This usually takes 20 to 90 s.`
+                : `${d.config.model} is comparing round ${round} with your video and fixing the plan.`;
+    if (last.attempt > 1) now += ` (retry ${last.attempt - 1}: its last answer wasn't usable)`;
+  }
+  if (last.type === "model_reply") { active = last.stage === "analyse" ? "plan" : "fix"; now = last.valid ? "Got the model's answer." : "The model's answer had problems; asking again."; }
+  if (last.type === "iteration") { active = "sim"; now = `Round ${last.iteration}: the robot is trying the task in MuJoCo.`; }
+  if (last.type === "simulated") { active = "sim"; now = `Round ${last.iteration} finished: ${last.all_success ? "success" : "not there yet"}.`; }
+  if (d.status === "done") { active = "done"; now = ""; }
+  if (d.status === "failed") { active = "failed"; now = last.message; }
+  if (d.status === "stopped" || d.status === "interrupted") { active = "stopped"; now = d.status === "stopped" ? "You stopped this run." : "The server stopped before this run finished."; }
+  const order = stages.map(s => s.k);
+  const ai = order.indexOf(active);
+  const since = last.t ? Date.now() / 1000 - last.t : 0;
+  return { now, since, html: `<div class="track" role="list" aria-label="Progress">${stages.map((s, i) => {
+    let cls = "";
+    if (active === "done" || (ai > i && ai >= 0)) cls = "done";
+    if (s.k === active) cls = active === "done" ? "done" : "active";
+    if ((active === "failed" || active === "stopped") && i === Math.max(0, order.indexOf(stageOf(last)))) cls = "failed";
+    const sub = s.k === "done" ? (d.status === "done" ? (d.all_success ? "Robot succeeded" : "Ran out of rounds") : d.status === "running" ? "Waiting" : STATUS_WORD[d.status])
+              : s.k === "sim" || s.k === "fix" ? (round ? `${s.s} · round ${round}` : s.s) : s.s;
+    return `<div class="stage ${cls}" role="listitem"><span class="n">Step ${i + 1}</span><b>${s.b}</b><small>${esc(sub)}</small></div>`;
+  }).join("")}</div>` };
+}
+const STATUS_WORD = {failed: "Stopped by an error", stopped: "Stopped", interrupted: "Interrupted"};
+const stageOf = e => e.type === "model_call" || e.type === "model_reply" ? (e.stage === "analyse" ? "plan" : "fix") : e.type === "iteration" || e.type === "simulated" ? "sim" : "watch";
+
+/* ---------- results ---------- */
+function checkSentence(c) {
+  const o = nice(c.object);
+  if (c.type === "object_on") return c.passed ? `The ${o} ended up on/in the ${nice(c.support)}.` : `The ${o} did not end up on/in the ${nice(c.support)} (${c.detail}).`;
+  if (c.type === "object_lifted") return c.passed ? `The robot lifted the ${o} (${c.detail}).` : `The robot never lifted the ${o} high enough (${c.detail}).`;
+  return c.passed ? `The ${o} reached its target spot (${c.detail}).` : `The ${o} missed its target spot (${c.detail}).`;
+}
+
+function stepProblems(m) {
+  const out = [];
+  for (const s of m?.steps || []) {
+    if (s.reachable === false) out.push(`Step ${s.i} ("${s.language}") was out of the robot's reach.`);
+    else if (s.tcp_error_mm > 20) out.push(`Step ${s.i} ("${s.language}") missed its target by ${s.tcp_error_mm} mm.`);
+    if (s.action === "close" && !s.grasped.length) out.push(`Step ${s.i}: the gripper closed on nothing.`);
+  }
+  return out.slice(0, 4);
+}
+
+function render() {
+  const d = state.detail;
+  const it = d.iterations[state.round - 1];
+  const running = d.status === "running";
+  const p = progress(d);
+  const latest = d.iterations[d.iterations.length - 1];
+  const title = latest?.spec?.task_description || d.task || "Working out what the person is doing…";
+
+  let verdict = "";
+  if (it?.metrics) {
+    const m = it.metrics;
+    if (m.error) verdict = `<div class="verdict fail"><h3>Round ${it.n}: the scene couldn't be simulated</h3><p>${esc(m.error)}</p></div>`;
+    else {
+      const probs = stepProblems(m);
+      verdict = `<div class="verdict ${m.all_success ? "pass" : "fail"}">
+        <h3>Round ${it.n}: ${m.all_success ? "the robot did the task" : "the robot didn't manage it yet"}</h3>
+        <ul>${m.success.map(c => `<li class="${c.passed ? "ok" : "no"}">${esc(checkSentence(c))}</li>`).join("")}
+            ${probs.map(t => `<li class="no">${esc(t)}</li>`).join("")}</ul>
+        ${it.spec?.done != null ? `<p class="hint">The model ${it.spec.done ? "thinks this matches your video" : "thinks it needs more work"}.</p>` : ""}
+      </div>`;
+    }
+  }
+
+  $("#main").innerHTML = `
+    <div class="head">
+      <div>
+        <h2>${esc(title)}</h2>
+        <div class="meta">
+          <span>${esc(ROBOT_NAMES[d.config.robot] || d.config.robot)} with ${esc(d.config.model)}</span>
+          <span>Round ${d.iterations.length} of up to ${d.config.iters}</span>
+          <span>Started ${clock(d.events[0]?.t || d.created)}</span>
+        </div>
+      </div>
+      <div class="actions">
+        ${running ? `<button class="btn danger" data-act="stop">Stop</button>` : ""}
+        ${d.iterations.length ? `<button class="btn" data-act="replay" title="Opens an interactive MuJoCo window on this computer">Watch in 3D</button>` : ""}
+        <a class="btn" href="/api/runs/${d.id}/zip" download>Download files</a>
+        ${!running ? `<button class="btn danger" data-act="delete">Delete</button>` : ""}
+      </div>
+    </div>
+    ${p.html}
+    ${p.now ? `<p class="now" id="now">${esc(p.now)} ${running ? `<time id="since">${ago(p.since)} ago</time>` : ""}</p>` : ""}
+
+    ${verdict}
+    <div class="duo">
+      <figure><figcaption>Your video <span>what the person did</span></figcaption>
+        ${d.input_video ? `<video src="${d.input_video}" controls muted loop playsinline></video>` : `<div class="placeholder">Uploading…</div>`}</figure>
+      <figure><figcaption>Robot in simulation <span>${it ? `round ${it.n}` : ""}</span></figcaption>
+        ${it?.video ? `<video src="${it.video}" controls muted loop autoplay playsinline></video>`
+          : `<div class="placeholder">${running ? "The robot's attempt appears here as soon as the first round is simulated." : "No simulation for this run."}</div>`}</figure>
+    </div>
+
+    ${d.iterations.length ? `<h3 class="sec">Rounds</h3>
+    <ul class="rounds">${d.iterations.map(r => {
+      const m = r.metrics;
+      const res = !m ? `<span>simulating…</span>` : m.error ? `<span class="no">couldn't simulate</span>` : m.all_success ? `<span class="ok">succeeded</span>` : `<span class="no">${m.success.filter(c => !c.passed).length} of ${m.success.length} checks failed</span>`;
+      const ch = r.n === 1 ? "First attempt, from watching the video." : (r.spec?.changes || "");
+      return `<li><button data-round="${r.n}" aria-pressed="${state.round === r.n}"><b>Round ${r.n}</b>${res}<span class="ch">${esc(ch)}</span></button></li>`;
+    }).join("")}</ul>` : ""}
+
+    ${it ? `<div class="strip-title">What the model saw in your video</div>${film(d.video_frames)}
+            <div class="strip-title">What the robot did in round ${it.n}</div>${film(it.frames)}` :
+      d.video_frames.length ? `<div class="strip-title">Frames sent to the model</div>${film(d.video_frames)}` : ""}
+
+    <h3 class="sec">Details</h3>
+    ${details(d, it)}
+  `;
+  clearInterval(state.timer);
+  if (running) state.timer = setInterval(() => {
+    const el = $("#since"), last = d.events[d.events.length - 1];
+    if (el && last) el.textContent = ago(Date.now() / 1000 - last.t) + " ago";
+  }, 1000);
+}
+
+function film(frames) {
+  return frames.length ? `<div class="film">${frames.map(f => `<figure><img src="${f.src}" alt="${esc(f.label)}" loading="lazy" data-zoom><figcaption>${esc(f.label)}</figcaption></figure>`).join("")}</div>` : `<p class="hint">No frames yet.</p>`;
+}
+
+function details(d, it) {
+  const tabs = [["steps", "Robot's plan"], ["objects", "Objects"], ["reply", "Model's answers"], ["spec", "Scene JSON"], ["activity", "Activity log"], ["log", "Process output"]];
+  return `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${state.tab === k}">${l}</button>`).join("")}</div>
+    <div class="panel" role="tabpanel">${tabBody(d, it)}</div>`;
+}
+
+function tabBody(d, it) {
+  const spec = it?.spec, m = it?.metrics;
+  switch (state.tab) {
+    case "steps": {
+      if (!spec) return `<pre>The plan appears once the model has answered.</pre>`;
+      const res = m?.steps || [];
+      return `<table><thead><tr><th>#</th><th>Step and the model's reason</th><th>Target</th><th class="num">Miss</th><th>Holding after</th></tr></thead><tbody>${
+        spec.plan.map((s, i) => {
+          const r = res[i] || {};
+          const target = s.pos ? `(${s.pos.join(", ")}) m` : s.delta_cm ? `by (${s.delta_cm.join(", ")}) cm` : s.seconds ? `${s.seconds} s` : "";
+          const miss = r.tcp_error_mm == null ? "" : `<span class="${r.reachable === false || r.tcp_error_mm > 20 ? "bad" : ""}">${r.tcp_error_mm} mm${r.reachable === false ? ", out of reach" : ""}</span>`;
+          return `<tr><td>${i}</td><td>${esc(s.language || s.action)}<div class="why">${esc(s.reason)}</div></td><td>${esc(target)}${s.yaw != null ? `<div class="why">yaw ${s.yaw}°</div>` : ""}</td><td class="num">${miss}</td><td>${esc((r.grasped || []).map(nice).join(", ") || (m ? "nothing" : ""))}</td></tr>`;
+        }).join("")}</tbody></table>`;
+    }
+    case "objects": {
+      if (!spec) return `<pre>Objects appear once the model has answered.</pre>`;
+      const o = m?.objects || {};
+      return `<table><thead><tr><th>Object</th><th>Shape and size (half-extents, m)</th><th>Start (m)</th><th>End (m)</th><th class="num">Lifted</th></tr></thead><tbody>${
+        spec.objects.map(ob => `<tr><td><span class="dot" style="background:rgb(${(ob.rgba || [.6,.6,.6]).slice(0, 3).map(v => Math.round(v * 255)).join(",")})"></span> ${esc(nice(ob.name))}${ob.fixed ? '<div class="why">fixed in place</div>' : ""}</td><td>${esc(ob.shape)} ${esc(ob.size.join(" × "))}</td><td>${esc((o[ob.name]?.initial || ob.pos).join(", "))}</td><td>${esc(o[ob.name]?.final?.join(", ") || "")}</td><td class="num">${o[ob.name] ? o[ob.name].max_lift_cm + " cm" : ""}</td></tr>`).join("")}</tbody></table>`;
+    }
+    case "reply": {
+      const parts = [`First answer (from watching the video):\n\n${d.analysis || "Not yet."}`]
+        .concat(d.iterations.filter(r => r.critique).map(r => `\n\n────────\nCritique after round ${r.n} (became round ${r.n + 1}):\n\n${r.critique}`));
+      return `<pre>${esc(parts.join(""))}</pre>`;
+    }
+    case "spec": return `<pre>${esc(spec ? JSON.stringify(spec, null, 2) : "No scene yet.")}</pre>`;
+    case "activity": return `<ul class="log">${d.events.map(e => `<li><time>${clock(e.t)}</time><b>${esc(nice(e.type))}</b><span>${esc(e.message || "")}</span></li>`).join("")}</ul>`;
+    case "log": {
+      const tb = d.events.find(e => e.traceback)?.traceback;
+      return `<pre>${esc(d.process_log || "Empty.")}${tb ? "\n\n" + esc(tb) : ""}</pre>`;
+    }
+  }
+}
+
+$("#main").addEventListener("click", async e => {
+  const round = e.target.closest("[data-round]");
+  if (round) { state.round = +round.dataset.round; return render(); }
+  const tab = e.target.closest("[data-tab]");
+  if (tab) { state.tab = tab.dataset.tab; return render(); }
+  const img = e.target.closest("[data-zoom]");
+  if (img) { $("#zoomImg").src = img.src; $("#zoomCap").textContent = img.alt; $("#zoom").showModal(); return; }
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if (!act) return;
+  const id = state.current;
+  try {
+    if (act === "stop") await api(`/api/runs/${id}/stop`, { method: "POST" });
+    if (act === "replay") await api(`/api/runs/${id}/replay` + (state.round ? `?iteration=${state.round}` : ""), { method: "POST" });
+    if (act === "delete") {
+      if (!confirm("Delete this run and all its files?")) return;
+      await api(`/api/runs/${id}`, { method: "DELETE" });
+      state.current = null; state.detail = null; history.replaceState(null, "", "#");
+      await loadRuns(); return renderIntro();
+    }
+    refresh(); loadRuns();
+  } catch (err) { alert(err.message); }
+});
+$("#zoom").addEventListener("click", () => $("#zoom").close());
+
+(async () => {
+  state.config = await api("/api/config");
+  setupForm();
+  await loadRuns();
+  const id = location.hash.slice(1);
+  if (id && state.runs.some(r => r.id === id)) selectRun(id); else renderIntro();
+})();
+</script>
+</body>
+</html>

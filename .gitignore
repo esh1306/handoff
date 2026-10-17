@@ -9,3 +9,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 *.egg-info/
+
+# video2sim
+video2sim/runs/
+mujoco-env/
