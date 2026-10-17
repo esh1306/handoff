@@ -4,12 +4,29 @@ Runs the Handoff pipeline stages, in order, over a single take directory.
 """
 
 import argparse
+from pathlib import Path
 
 STAGES = ["perception", "transcribe", "actions", "vlm", "export", "replay", "compose"]
+OUTPUTS = {"actions": "actions.jsonl", "replay": "replay.mp4"}
 
 
 def run_stage(stage, take_dir, video, force):
-    print(f"[{stage}] take={take_dir} video={video} force={force} -- not yet implemented")
+    out = Path(take_dir) / OUTPUTS.get(stage, "")
+    if stage in OUTPUTS and out.exists() and not force:
+        print(f"[{stage}] {out} exists, skipping (--force to rerun)")
+        return
+    if stage == "actions":
+        from handoff.actions import write_actions_jsonl
+        from handoff.config import load_config
+        cfg = load_config()
+        print(f"[actions] wrote {write_actions_jsonl(take_dir, window_s=cfg.window_s, fps=cfg.fps)}")
+    elif stage == "replay":
+        from handoff.replay import replay
+        m = replay(take_dir)
+        checks = ", ".join(f"{c['type']}={'pass' if c['passed'] else 'fail'}" for c in m["success"])
+        print(f"[replay] wrote {out} ({checks})")
+    else:
+        print(f"[{stage}] take={take_dir} video={video} force={force} -- not yet implemented")
 
 
 def main():

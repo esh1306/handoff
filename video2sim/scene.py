@@ -12,7 +12,7 @@ SIZE_LEN = {"box": 3, "cylinder": 2, "sphere": 1, "container": 3}
 
 def half_height(obj):
     s = obj["size"]
-    return {"box": s[2], "container": s[2], "cylinder": s[1], "sphere": s[0]}[obj["shape"]]
+    return s[{"box": 2, "container": 2, "cylinder": 1, "sphere": 0}[obj["shape"]]]
 
 
 def validate(spec):
